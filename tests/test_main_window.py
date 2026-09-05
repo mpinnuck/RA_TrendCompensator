@@ -33,7 +33,10 @@ class FakeViewModel:
 
 @pytest.fixture
 def main_window():
-    window = MainWindow(FakeViewModel())
+    try:
+        window = MainWindow(FakeViewModel())
+    except tk.TclError as error:
+        pytest.skip(f"Tk is unavailable: {error}")
     window.withdraw()
     yield window
     window.destroy()

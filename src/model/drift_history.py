@@ -27,6 +27,12 @@ class DriftHistory:
             self._rate_changes.append((timestamp, value))
             self._trim(self._rate_changes, timestamp)
 
+    def clear(self):
+        """Removes all chart samples and rate-change markers."""
+        with self._lock:
+            self._samples.clear()
+            self._rate_changes.clear()
+
     def _trim(self, buf, now):
         cutoff = now - self.max_seconds
         while buf and buf[0][0] < cutoff:

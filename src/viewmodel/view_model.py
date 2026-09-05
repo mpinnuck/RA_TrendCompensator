@@ -132,6 +132,11 @@ class RATrendCompensatorViewModel:
         """Thread-safe (samples, rate_changes) snapshot for the View's drift chart."""
         return self.drift_history.snapshot()
 
+    def clear_drift_history(self):
+        """Removes the samples and markers currently shown on the drift chart."""
+        self.drift_history.clear()
+        self._log("Drift chart cleared.")
+
     # -- lifecycle -----------------------------------------------------------
 
     def start(self):

@@ -9,7 +9,7 @@ from src.view.settings_dialog import SettingsDialog
 
 LOG_POLL_MS = 250
 CHART_POLL_MS = 1000
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 
 class MainWindow(tk.Tk):
@@ -77,7 +77,9 @@ class MainWindow(tk.Tk):
         self.paned.grid(row=1, column=0, sticky="nsew")
 
         chart_frame = ttk.Frame(self.paned, padding=(10, 0, 10, 5))
-        self.chart = DriftChartPanel(chart_frame, history_hours=self.vm.config["chart_history_hours"])
+        self.chart = DriftChartPanel(
+            chart_frame, history_hours=self.vm.config["chart_history_hours"], on_clear=self._on_clear_graph
+        )
         self.chart.pack(fill="both", expand=True)
         self.paned.add(chart_frame, weight=1)
 
@@ -122,6 +124,9 @@ class MainWindow(tk.Tk):
 
     def _on_dry_run_toggle(self):
         self.vm.set_dry_run(self.dry_run_var.get())
+
+    def _on_clear_graph(self):
+        self.vm.clear_drift_history()
 
     def _on_settings(self):
         SettingsDialog(self, dict(self.vm.config), self._on_settings_saved)

@@ -12,7 +12,10 @@ from src.model.drift_history import DriftHistory
 
 @pytest.fixture
 def root():
-    r = tk.Tk()
+    try:
+        r = tk.Tk()
+    except tk.TclError as error:
+        pytest.skip(f"Tk is unavailable: {error}")
     r.withdraw()  # headless -- don't flash a window during test runs
     yield r
     r.destroy()

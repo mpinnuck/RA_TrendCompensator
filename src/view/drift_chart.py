@@ -22,9 +22,10 @@ MAX_RATE_LABELS = 12  # thin labels out once more than this many markers are in 
 
 
 class DriftChartPanel(ttk.Frame):
-    def __init__(self, parent, history_hours):
+    def __init__(self, parent, history_hours, on_clear=None):
         super().__init__(parent)
         self.window_seconds = history_hours * 3600
+        self.on_clear = on_clear
         self._pan_start_xdata = None
         self._pan_start_xlim = None
         self._rate_lines = []  # list of dicts: ts, val, dt, vline, text
@@ -45,6 +46,7 @@ class DriftChartPanel(ttk.Frame):
             toolbar, text="Follow live", variable=self.follow_var, command=self._on_follow_toggle
         ).pack(side="left")
         ttk.Button(toolbar, text="Reset view", command=self._on_reset_view).pack(side="left", padx=(8, 0))
+        ttk.Button(toolbar, text="Clear graph", command=self._on_clear_graph).pack(side="left", padx=(8, 0))
         ttk.Label(toolbar, text="Scroll to zoom, drag to pan").pack(side="right")
 
         self.figure = Figure(figsize=(5, 3), dpi=100)
@@ -157,6 +159,19 @@ class DriftChartPanel(ttk.Frame):
         end = xdata[-1]
         start = max(xdata[0], datetime.fromtimestamp(end.timestamp() - self.window_seconds))
         self.ax.set_xlim(start, end)
+        self.canvas.draw_idle()
+
+    def _on_clear_graph(self):
+        if self.on_clear is not None:
+            self.on_clear()
+        self.line.set_data([], [])
+        for entry in self._rate_lines:
+            entry["vline"].remove()
+            if entry["text"] is not None:
+                entry["text"].remove()
+        self._rate_lines.clear()
+        self.ax.relim()
+        self.ax.autoscale_view()
         self.canvas.draw_idle()
 
     # -- mouse pan / zoom -------------------------------------------------
