@@ -54,7 +54,7 @@ class DriftChartPanel(ttk.Frame):
         self.ax.set_ylabel("RA guide error (arcsec)")
         self.ax.grid(True, linewidth=0.4, alpha=0.5)
         (self.line,) = self.ax.plot([], [], color="#2b6cb0", linewidth=0.8)
-        self.ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+        self._configure_time_axis()
         self.figure.tight_layout()
 
         self.canvas = FigureCanvasTkAgg(self.figure, master=self)
@@ -94,6 +94,15 @@ class DriftChartPanel(ttk.Frame):
 
         self._update_rate_labels()
         self.canvas.draw_idle()
+
+    def _configure_time_axis(self):
+        locator = mdates.AutoDateLocator(minticks=3, maxticks=6)
+        formatter = mdates.ConciseDateFormatter(locator)
+        formatter.formats[5] = "%H:%M:%S"
+        formatter.zero_formats[5] = "%H:%M:%S"
+        self.ax.set_xlabel("Time")
+        self.ax.xaxis.set_major_locator(locator)
+        self.ax.xaxis.set_major_formatter(formatter)
 
     # -- rate-change markers ------------------------------------------------
 

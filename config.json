@@ -17,15 +17,84 @@
   "sim_true_drift_arcsec_per_sec": 0.02,
   "sim_drift_walk_std": 0.0008,
   "sim_drift_ramp_arcsec_per_sec_per_hour": 0.0,
-  "sim_drift_profile": null,
+  "sim_drift_profile": [
+    [
+      0,
+      0.0626
+    ],
+    [
+      780,
+      0.0093
+    ],
+    [
+      1560,
+      0.0333
+    ],
+    [
+      2340,
+      -0.0402
+    ],
+    [
+      3120,
+      -0.0041
+    ],
+    [
+      3900,
+      0.0732
+    ],
+    [
+      4680,
+      0.0902
+    ],
+    [
+      5460,
+      0.1454
+    ],
+    [
+      6240,
+      0.1325
+    ],
+    [
+      7020,
+      0.1882
+    ],
+    [
+      7800,
+      0.2251
+    ],
+    [
+      8580,
+      0.1966
+    ],
+    [
+      9360,
+      0.2118
+    ],
+    [
+      10140,
+      0.2516
+    ],
+    [
+      10920,
+      0.2534
+    ],
+    [
+      11700,
+      0.2496
+    ],
+    [
+      12480,
+      0.147
+    ]
+  ],
   "sim_noise_arcsec": 0.15,
   "sim_pull_to_zero_per_step": 0.001,
   "sim_guide_step_interval_s": 2.0,
   "sim_speed_multiplier": 1.0,
-  "sim_declination_deg": 0.0,
-  "sim_target_name": "",
-  "sim_target_ra_hours": 0.0,
-  "sim_start_hour_angle_hours": 0.0,
+  "sim_declination_deg": -63.8,
+  "sim_target_name": "NGC 6744",
+  "sim_target_ra_hours": 19.1628,
+  "sim_start_hour_angle_hours": -0.78,
   "sim_polar_error_arcmin": 0.0,
   "sim_polar_error_angle_deg": 0.0,
   "sim_bias_direction": "west"

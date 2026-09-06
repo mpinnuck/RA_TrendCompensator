@@ -3,6 +3,7 @@
 import time
 
 import pytest
+import matplotlib.dates as mdates
 
 tk = pytest.importorskip("tkinter")
 
@@ -47,6 +48,13 @@ def test_update_data_populates_the_line_and_markers(panel):
 
     assert len(panel.line.get_xdata()) == len(samples)
     assert len(panel._rate_lines) == len(rate_changes)
+
+
+def test_simulation_time_axis_shows_simulated_time_of_day(panel):
+    panel.update_data([(1_000_000_000, 1.0), (1_000_000_002, 2.0)], [])
+
+    assert panel.ax.get_xlabel() == "Time"
+    assert isinstance(panel.ax.xaxis.get_major_formatter(), mdates.ConciseDateFormatter)
 
 
 def test_scroll_zoom_disables_follow(panel):
