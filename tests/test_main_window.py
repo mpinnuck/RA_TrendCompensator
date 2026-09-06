@@ -14,6 +14,7 @@ class FakeViewModel:
         self.dry_run = False
         self.running = False
         self.current_offset = 0.0
+        self.clear_drift_history_calls = 0
 
     def start(self):
         self.running = True
@@ -29,6 +30,9 @@ class FakeViewModel:
 
     def set_dry_run(self, dry_run):
         self.dry_run = dry_run
+
+    def clear_drift_history(self):
+        self.clear_drift_history_calls += 1
 
 
 @pytest.fixture
@@ -52,6 +56,12 @@ def test_start_stop_button_turns_green_while_running(main_window):
 
     assert main_window.start_stop_button.cget("text") == "Start"
     assert main_window.status_var.get() == "Stopped"
+
+
+def test_clear_graph_delegates_to_view_model(main_window):
+    main_window._on_clear_graph()
+
+    assert main_window.vm.clear_drift_history_calls == 1
 
 
 def test_version_label_is_shown_in_top_right_control_column(main_window):

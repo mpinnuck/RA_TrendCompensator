@@ -115,3 +115,12 @@ def test_update_config_refuses_while_running(view_model):
     view_model.running = True
     with pytest.raises(RuntimeError):
         view_model.update_config(dict(view_model.config))
+
+
+def test_clear_drift_history_removes_chart_data(view_model):
+    view_model.drift_history.add_sample(1.0, 0.5)
+    view_model.drift_history.add_rate_change(1.0, 0.1)
+
+    view_model.clear_drift_history()
+
+    assert view_model.get_drift_snapshot() == ([], [])

@@ -50,6 +50,18 @@ def test_update_data_populates_the_line_and_markers(panel):
     assert len(panel._rate_lines) == len(rate_changes)
 
 
+def test_clear_graph_removes_plotted_data_markers_and_calls_callback(root):
+    clear_calls = []
+    panel = DriftChartPanel(root, history_hours=8, on_clear=lambda: clear_calls.append(True))
+    panel.update_data(*_fill_history())
+
+    panel._on_clear_graph()
+
+    assert clear_calls == [True]
+    assert len(panel.line.get_xdata()) == 0
+    assert panel._rate_lines == []
+
+
 def test_simulation_time_axis_shows_simulated_time_of_day(panel):
     panel.update_data([(1_000_000_000, 1.0), (1_000_000_002, 2.0)], [])
 
