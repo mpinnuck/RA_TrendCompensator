@@ -1,8 +1,15 @@
-"""Entry point: load config, build the ViewModel, launch the View.
+r"""Entry point: load config, build the ViewModel, launch the View.
 
 Run this from the project root (RA_TrendCompensator/):
     python main.py
+
+Build
+.venv\Scripts\Activate.ps1
+pyinstaller --noconfirm --clean ra_trend_compensator.spec 
+copy dist\RA_TrendCompensator.exe C:\D_Drive\Astro\apps\RATrendCompensator\
+
 """
+
 
 from src.config import load_config
 from src.viewmodel.view_model import RATrendCompensatorViewModel
