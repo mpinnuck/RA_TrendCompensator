@@ -5,13 +5,14 @@ exercised (and its effect on drift observed) without a telescope connected.
 
 
 class SimulatedMountController:
-    def __init__(self, max_rate_magnitude, logger, declination_deg=0.0):
+    def __init__(self, max_rate_magnitude, logger, declination_deg=0.0, right_ascension_hours=0.0):
         self.max_rate_magnitude = max_rate_magnitude
         self.logger = logger
         self.connected = False
         self._ra_rate = 0.0
         self._side_of_pier = 0
         self._declination_deg = declination_deg
+        self._right_ascension_hours = right_ascension_hours
 
     def connect(self):
         self.connected = True
@@ -30,6 +31,9 @@ class SimulatedMountController:
 
     def get_side_of_pier(self):
         return self._side_of_pier
+
+    def get_right_ascension(self):
+        return self._right_ascension_hours
 
     def get_declination(self):
         return self._declination_deg

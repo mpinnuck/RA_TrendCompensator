@@ -9,7 +9,7 @@ from src.view.settings_dialog import SettingsDialog
 
 LOG_POLL_MS = 250
 CHART_POLL_MS = 1000
-APP_VERSION = "1.8.0"
+APP_VERSION = "2.0.0"
 
 
 class MainWindow(tk.Tk):
@@ -66,9 +66,14 @@ class MainWindow(tk.Tk):
             row=0, column=6, sticky="e"
         )
 
+        self.mount_coordinates_var = tk.StringVar(value="Mount RA: --  Dec: --")
+        ttk.Label(controls, textvariable=self.mount_coordinates_var).grid(
+            row=1, column=0, sticky="w", pady=(8, 0)
+        )
+
         self.offset_var = tk.StringVar(value="RightAscensionRate offset: 0.0000")
         ttk.Label(controls, textvariable=self.offset_var).grid(
-            row=1, column=0, columnspan=7, sticky="w", pady=(8, 0)
+            row=1, column=1, columnspan=6, sticky="w", padx=(20, 0), pady=(8, 0)
         )
 
         # Vertical split: drift chart on top, log panel below. Both panes get
@@ -159,6 +164,10 @@ class MainWindow(tk.Tk):
     def _poll_chart(self):
         samples, rate_changes = self.vm.get_drift_snapshot()
         self.chart.update_data(samples, rate_changes)
+        right_ascension, declination = self.vm.get_mount_coordinates()
+        ra_text = f"{right_ascension:.4f} h" if right_ascension is not None else "--"
+        dec_text = f"{declination:+.2f} deg" if declination is not None else "--"
+        self.mount_coordinates_var.set(f"Mount RA: {ra_text}  Dec: {dec_text}")
         self.after(CHART_POLL_MS, self._poll_chart)
 
     def _append_log(self, line):

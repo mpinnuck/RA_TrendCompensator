@@ -105,7 +105,7 @@ while ($true) {
 }
 ```
 
-Each line includes `running`, `phd2_connected`, `dry_run`, `current_offset`, current guide/trend/RMS measurements, `declination_deg`, `side_of_pier`, and a Unix `timestamp`. `side_of_pier` is rendered as `"East"`, `"West"`, or `"Unknown"` for external display.
+Each line includes `running`, `phd2_connected`, `dry_run`, `current_offset`, current guide/trend/RMS measurements, `right_ascension_hours`, `declination_deg`, `side_of_pier`, and a Unix `timestamp`. `side_of_pier` is rendered as `"East"`, `"West"`, or `"Unknown"` for external display.
 
 The server stays available while the app is stopped so an external client can observe application state. It does not build or serialize snapshots while no clients are connected.
 

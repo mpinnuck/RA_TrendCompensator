@@ -38,6 +38,13 @@ class MountController:
         except Exception:
             return None
 
+    def get_right_ascension(self):
+        """Current mount Right Ascension in hours, or None if unavailable."""
+        try:
+            return self.telescope.RightAscension
+        except Exception:
+            return None
+
     def get_declination(self):
         """Current target Declination in degrees, or None if unavailable.
         Needed to correctly convert an angular drift rate (arcsec/s, from

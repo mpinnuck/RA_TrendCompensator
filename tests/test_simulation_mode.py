@@ -87,6 +87,7 @@ def test_simulation_mode_builds_real_model_objects_with_no_mocking(tmp_path):
     assert isinstance(vm.mount, SimulatedMountController)
     assert isinstance(vm.phd2, SimulatedPHD2Source)
     assert vm.get_status_snapshot()["phd2_connected"] is False
+    assert vm.get_status_snapshot()["right_ascension_hours"] == 0.0
 
 
 def test_guide_steps_populate_chart_history_via_real_tick(tmp_path):

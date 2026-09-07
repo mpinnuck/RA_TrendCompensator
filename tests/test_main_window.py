@@ -31,6 +31,9 @@ class FakeViewModel:
     def get_status_client_count(self):
         return 0
 
+    def get_mount_coordinates(self):
+        return 19.1628, -63.8
+
     def set_dry_run(self, dry_run):
         self.dry_run = dry_run
 
@@ -82,3 +85,9 @@ def test_status_client_count_is_displayed(main_window):
     main_window._poll_log_queue()
 
     assert main_window.status_clients_var.get() == "Status clients: 3"
+
+
+def test_mount_coordinates_are_displayed_beside_the_offset(main_window):
+    main_window._poll_chart()
+
+    assert main_window.mount_coordinates_var.get() == "Mount RA: 19.1628 h  Dec: -63.80 deg"

@@ -166,6 +166,7 @@ def test_get_status_snapshot_reflects_current_state(view_model):
     assert snapshot["last_slope_arcsec_per_sec"] is not None
     assert snapshot["last_trend_n_samples"] >= 1
     assert "timestamp" in snapshot
+    assert snapshot["right_ascension_hours"] == view_model.mount.right_ascension_hours
     assert snapshot["guide_rms_arcsec"] is not None
     assert snapshot["guide_rms_arcsec"] >= 0.0
 

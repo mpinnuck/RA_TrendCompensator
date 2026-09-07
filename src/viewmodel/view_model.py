@@ -55,7 +55,9 @@ class RATrendCompensatorViewModel:
         so the rest of the pipeline runs unmodified with no hardware."""
         if config.get("simulation_mode", False):
             self.mount = SimulatedMountController(
-                config["max_rate_magnitude"], self._log, declination_deg=config["sim_declination_deg"]
+                config["max_rate_magnitude"], self._log,
+                declination_deg=config["sim_declination_deg"],
+                right_ascension_hours=config["sim_target_ra_hours"],
             )
             self.phd2 = SimulatedPHD2Source(
                 get_applied_rate=self.mount.get_ra_rate,
@@ -164,6 +166,10 @@ class RATrendCompensatorViewModel:
         """Return the number of clients connected to the status server."""
         return self.status_server.client_count() if self.status_server is not None else 0
 
+    def get_mount_coordinates(self):
+        """Return the mount's live Right Ascension (hours) and Declination (degrees)."""
+        return self.mount.get_right_ascension(), self.mount.get_declination()
+
     def clear_drift_history(self):
         """Removes the samples and markers currently shown on the drift chart."""
         self.drift_history.clear()
@@ -185,6 +191,7 @@ class RATrendCompensatorViewModel:
             "guide_rms_trend_arcsec_per_sec": rms_trend_slope,
             "guide_rms_trend_n_samples": rms_trend_n,
             "phd2_avg_dist_arcsec": self.last_phd2_avg_dist_arcsec,
+            "right_ascension_hours": self.mount.get_right_ascension(),
             "declination_deg": self.mount.get_declination(),
             "side_of_pier": format_pier_side(self.last_side_of_pier),
             "timestamp": time.time(),

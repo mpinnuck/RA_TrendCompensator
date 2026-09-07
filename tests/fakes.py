@@ -13,6 +13,7 @@ class FakeMountController:
         self.connected = False
         self.ra_rate = 0.0
         self.side_of_pier = 0
+        self.right_ascension_hours = 0.0
         self.declination_deg = declination_deg
         self.set_ra_rate_calls = []
 
@@ -28,6 +29,9 @@ class FakeMountController:
 
     def get_side_of_pier(self):
         return self.side_of_pier
+
+    def get_right_ascension(self):
+        return self.right_ascension_hours
 
     def get_declination(self):
         return self.declination_deg
