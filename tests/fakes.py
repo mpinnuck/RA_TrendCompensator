@@ -49,12 +49,15 @@ class FakePHD2Client:
         self.on_app_state = on_app_state
         self.logger = logger or (lambda msg: None)
         self.started = False
+        self.is_connected = False
 
     def start(self):
         self.started = True
+        self.is_connected = True
 
     def stop(self):
         self.started = False
+        self.is_connected = False
 
     def emit_guide_step(self, ra_distance_raw):
         """Test helper: simulate PHD2 sending a GuideStep event."""

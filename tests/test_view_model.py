@@ -158,6 +158,7 @@ def test_get_status_snapshot_reflects_current_state(view_model):
     snapshot = view_model.get_status_snapshot()
 
     assert snapshot["running"] is False  # start() was never called in this fixture
+    assert snapshot["phd2_connected"] is False
     assert snapshot["dry_run"] == view_model.dry_run
     assert snapshot["current_offset"] == view_model.current_offset
     assert snapshot["current_ra_deviation_arcsec"] == view_model.last_raw_arcsec

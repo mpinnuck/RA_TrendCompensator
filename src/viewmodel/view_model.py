@@ -29,9 +29,6 @@ class RATrendCompensatorViewModel:
         self.config = config
         self.log_queue = queue.Queue()
         self.running = False
-
-        self._build_models(config)
-
         self.dry_run = config["dry_run"]
         self.current_offset = 0.0
         self.last_side_of_pier = None
@@ -41,6 +38,8 @@ class RATrendCompensatorViewModel:
         self.last_trend_n_samples = 0
         self.last_raw_arcsec = None
         self.last_phd2_avg_dist_arcsec = None
+
+        self._build_models(config)
 
     # -- model construction ---------------------------------------------
 
@@ -172,6 +171,7 @@ class RATrendCompensatorViewModel:
         rms_trend_slope, rms_trend_n = self.guide_quality.get_rms_trend()
         return {
             "running": self.running,
+            "phd2_connected": self.phd2.is_connected,
             "dry_run": self.dry_run,
             "current_offset": self.current_offset,
             "current_ra_deviation_arcsec": self.last_raw_arcsec,

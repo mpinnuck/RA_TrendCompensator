@@ -14,7 +14,7 @@
   "log_file": "ra_trend_compensator.log",
   "data_log_file": "ra_trend_compensator_data.csv",
   "chart_history_hours": 8.0,
-  "simulation_mode": true,
+  "simulation_mode": false,
   "sim_true_drift_arcsec_per_sec": 0.02,
   "sim_drift_walk_std": 0.0008,
   "sim_drift_ramp_arcsec_per_sec_per_hour": 0.0,
