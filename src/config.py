@@ -17,6 +17,7 @@ DEFAULTS = {
     "max_rate_magnitude": 1.0,
     "max_step_per_cycle": 0.05,
     "pixel_scale_arcsec": 0.51,
+    "log_folder": "",
     "log_file": "ra_trend_compensator.log",
     "data_log_file": "ra_trend_compensator_data.csv",
     "chart_history_hours": 8,
@@ -36,6 +37,13 @@ DEFAULTS = {
     "sim_polar_error_arcmin": 0.0,
     "sim_polar_error_angle_deg": 0.0,
     "sim_bias_direction": "west",
+    "status_server_enabled": True,
+    "status_server_host": "127.0.0.1",
+    "status_server_port": 4401,
+    "status_server_interval_seconds": 1.0,
+    "rms_window_seconds": 300,
+    "rms_trend_window_seconds": 1800,
+    "rms_sample_interval_seconds": 60,
 }
 
 
@@ -53,3 +61,17 @@ def save_config(config, path=DEFAULT_CONFIG_PATH):
     """Persist config to JSON."""
     with open(path, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
+
+
+def resolve_log_path(config, key):
+    """Resolve a log path config key ("log_file", "data_log_file") against
+    "log_folder". A blank log_folder means the app folder -- the configured
+    path is used exactly as-is. When a folder is set, only the file's
+    basename is kept (the folder takes over the location), and the folder
+    is created if it doesn't exist yet."""
+    path = config.get(key, "")
+    folder = (config.get("log_folder") or "").strip()
+    if not folder:
+        return path
+    os.makedirs(folder, exist_ok=True)
+    return os.path.join(folder, os.path.basename(path))

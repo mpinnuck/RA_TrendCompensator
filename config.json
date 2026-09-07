@@ -10,6 +10,7 @@
   "max_rate_magnitude": 1.0,
   "max_step_per_cycle": 0.05,
   "pixel_scale_arcsec": 0.51,
+  "log_folder": "C:/D_Drive/Astro/Logs/RATrendCompensator",
   "log_file": "ra_trend_compensator.log",
   "data_log_file": "ra_trend_compensator_data.csv",
   "chart_history_hours": 8.0,
@@ -97,5 +98,12 @@
   "sim_start_hour_angle_hours": -0.78,
   "sim_polar_error_arcmin": 0.0,
   "sim_polar_error_angle_deg": 0.0,
-  "sim_bias_direction": "west"
+  "sim_bias_direction": "west",
+  "status_server_enabled": true,
+  "status_server_host": "127.0.0.1",
+  "status_server_port": 4401,
+  "status_server_interval_seconds": 1.0,
+  "rms_window_seconds": 300,
+  "rms_trend_window_seconds": 1800,
+  "rms_sample_interval_seconds": 60
 }

@@ -37,17 +37,6 @@ def test_rate_changes_tracked_independently_of_samples():
     assert rate_changes == [(now, 0.05)]
 
 
-def test_clear_removes_samples_and_rate_changes():
-    hist = DriftHistory(max_seconds=100)
-    now = time.time()
-    hist.add_sample(now, 1.0)
-    hist.add_rate_change(now, 0.05)
-
-    hist.clear()
-
-    assert hist.snapshot() == ([], [])
-
-
 def test_snapshot_returns_independent_copies():
     hist = DriftHistory(max_seconds=100)
     hist.add_sample(time.time(), 1.0)

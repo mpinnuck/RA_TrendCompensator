@@ -7,7 +7,7 @@ caught here rather than surfacing later as a stack trace.
 """
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import filedialog, ttk
 
 from src.model.real_session_profiles import PROFILE_TARGETS, PROFILES
 
@@ -16,47 +16,64 @@ class SettingsDialog(tk.Toplevel):
     # (config key, checkbox label)
     CHECKBOX_FIELDS = [
         ("simulation_mode", "Simulation mode (synthetic drift data -- no PHD2 or mount hardware)"),
+        ("status_server_enabled", "Status server (local-only, for external tools e.g. a NINA plugin)"),
     ]
 
-    # (config key, display label, type to parse the entry into)
-    FIELDS = [
-        ("phd2_host", "PHD2 host", str),
-        ("phd2_port", "PHD2 port", int),
-        ("ascom_prog_id", "ASCOM ProgID", str),
-        ("window_seconds", "Trend window (s)", int),
-        ("min_samples_for_trend", "Min samples for trend", int),
-        ("apply_interval_seconds", "Apply interval (s)", int),
-        ("damping_factor", "Damping factor", float),
-        ("max_rate_magnitude", "Max rate magnitude", float),
-        ("max_step_per_cycle", "Max step per cycle", float),
-        ("pixel_scale_arcsec", "Pixel scale (arcsec/px)", float),
-        ("chart_history_hours", "Chart history (hours)", float),
-        ("log_file", "Log file", str),
-        ("data_log_file", "Data log CSV (guide steps + adjustments)", str),
-        ("sim_bias_direction", "Sim: bias direction", str),
-        ("sim_true_drift_arcsec_per_sec", "Sim: true drift rate (arcsec/s)", float),
-        ("sim_drift_walk_std", "Sim: drift random-walk (arcsec/s/step)", float),
-        ("sim_drift_ramp_arcsec_per_sec_per_hour", "Sim: drift ramp (arcsec/s per hour)", float),
-        ("sim_noise_arcsec", "Sim: guide noise (arcsec)", float),
-        ("sim_pull_to_zero_per_step", "Sim: long-term pull-to-zero", float),
-        ("sim_guide_step_interval_s", "Sim: guide step interval (s)", float),
-        ("sim_speed_multiplier", "Sim: speed multiplier", float),
-        ("sim_declination_deg", "Sim: declination (deg)", float),
-        ("sim_target_name", "Sim: target name", str),
-        ("sim_target_ra_hours", "Sim: target RA (hours)", float),
-        ("sim_start_hour_angle_hours", "Sim: start hour angle (h)", float),
-        ("sim_polar_error_arcmin", "Sim: polar alignment error (arcmin)", float),
-        ("sim_polar_error_angle_deg", "Sim: polar error angle (deg)", float),
+    # (config key, display label, type to parse the entry into) -- grouped
+    # into sections, which _build_widgets lays out side by side (columns)
+    # rather than stacked, so the dialog grows wide instead of tall and the
+    # Save button stays on screen.
+    SECTIONS = [
+        ("General", [
+            ("phd2_host", "PHD2 host", str),
+            ("phd2_port", "PHD2 port", int),
+            ("ascom_prog_id", "ASCOM ProgID", str),
+            ("window_seconds", "Trend window (s)", int),
+            ("min_samples_for_trend", "Min samples for trend", int),
+            ("apply_interval_seconds", "Apply interval (s)", int),
+            ("damping_factor", "Damping factor", float),
+            ("rms_window_seconds", "Guide RMS window (s)", int),
+            ("rms_trend_window_seconds", "Guide RMS trend window (s)", int),
+            ("rms_sample_interval_seconds", "Guide RMS sample interval (s)", int),
+            ("max_rate_magnitude", "Max rate magnitude", float),
+            ("max_step_per_cycle", "Max step per cycle", float),
+            ("pixel_scale_arcsec", "Pixel scale (arcsec/px)", float),
+        ]),
+        ("Logging & status", [
+            ("chart_history_hours", "Chart history (hours)", float),
+            ("log_folder", "Log folder (blank = app folder)", str),
+            ("log_file", "Log file", str),
+            ("data_log_file", "Data log CSV (guide steps + adjustments)", str),
+            ("status_server_host", "Status server host", str),
+            ("status_server_port", "Status server port", int),
+            ("status_server_interval_seconds", "Status server broadcast interval (s)", float),
+        ]),
+        ("Simulation (requires app stopped)", [
+            ("sim_bias_direction", "Sim: bias direction", str),
+            ("sim_true_drift_arcsec_per_sec", "Sim: true drift rate (arcsec/s)", float),
+            ("sim_drift_walk_std", "Sim: drift random-walk (arcsec/s/step)", float),
+            ("sim_drift_ramp_arcsec_per_sec_per_hour", "Sim: drift ramp (arcsec/s per hour)", float),
+            ("sim_noise_arcsec", "Sim: guide noise (arcsec)", float),
+            ("sim_pull_to_zero_per_step", "Sim: long-term pull-to-zero", float),
+            ("sim_guide_step_interval_s", "Sim: guide step interval (s)", float),
+            ("sim_speed_multiplier", "Sim: speed multiplier", float),
+        ]),
+        ("Target & polar alignment (optional)", [
+            ("sim_declination_deg", "Sim: declination (deg)", float),
+            ("sim_target_name", "Sim: target name", str),
+            ("sim_target_ra_hours", "Sim: target RA (hours)", float),
+            ("sim_start_hour_angle_hours", "Sim: start hour angle (h)", float),
+            ("sim_polar_error_arcmin", "Sim: polar alignment error (arcmin)", float),
+            ("sim_polar_error_angle_deg", "Sim: polar error angle (deg)", float),
+        ]),
     ]
 
-    # Section headers, keyed by the field they appear directly above.
-    SECTION_BREAKS = {
-        "phd2_host": "Connection",
-        "window_seconds": "Trend & control",
-        "chart_history_hours": "Chart & logging",
-        "sim_true_drift_arcsec_per_sec": "Simulation (requires app stopped)",
-        "sim_declination_deg": "Target & polar alignment (optional)",
-    }
+    # Flat list derived from SECTIONS -- used by _on_save_clicked for parsing.
+    FIELDS = [field for _name, fields in SECTIONS for field in fields]
+
+    # The profile controls (Load <name>/Clear buttons) are inserted into this
+    # section, directly after the sim_drift_ramp field.
+    PROFILE_SECTION = "Simulation (requires app stopped)"
 
     def __init__(self, parent, config, on_save):
         super().__init__(parent)
@@ -76,40 +93,62 @@ class SettingsDialog(tk.Toplevel):
 
     # -- layout ---------------------------------------------------------
 
-    def _section_header(self, body, row, text):
-        ttk.Separator(body, orient="horizontal").grid(
-            row=row, column=0, columnspan=2, sticky="ew", pady=(8, 2)
-        )
-        ttk.Label(body, text=text, font=("", 9, "bold")).grid(
-            row=row + 1, column=0, columnspan=2, sticky="w", pady=(0, 4)
-        )
-        return row + 2
+    # Two sections per column: (General, Logging & status) on the left,
+    # (Simulation, Target & polar) on the right.
+    COLUMNS = [(0, 1), (2, 3)]
 
     def _build_widgets(self):
         body = ttk.Frame(self, padding=12)
         body.grid(row=0, column=0, sticky="nsew")
-        body.grid_columnconfigure(1, weight=1)
 
-        row = 0
+        checkboxes = ttk.Frame(body)
+        checkboxes.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 4))
         for key, label in self.CHECKBOX_FIELDS:
             var = tk.BooleanVar(value=bool(self.config.get(key, False)))
-            ttk.Checkbutton(body, text=label, variable=var).grid(
-                row=row, column=0, columnspan=2, sticky="w", pady=(0, 6)
-            )
+            ttk.Checkbutton(checkboxes, text=label, variable=var).pack(anchor="w", pady=(0, 2))
             self.vars[key] = var
-            row += 1
 
-        for key, label, _type in self.FIELDS:
-            if key in self.SECTION_BREAKS:
-                row = self._section_header(body, row, self.SECTION_BREAKS[key])
-            ttk.Label(body, text=label).grid(row=row, column=0, sticky="w", pady=2)
+        for column, section_indexes in enumerate(self.COLUMNS):
+            column_frame = ttk.Frame(body, padding=(0 if column == 0 else 18, 0, 0, 0))
+            column_frame.grid(row=1, column=column, sticky="new")
+            row = 0
+            for section_index in section_indexes:
+                name, fields = self.SECTIONS[section_index]
+                frame = ttk.LabelFrame(column_frame, text=name, padding=10)
+                frame.grid(row=row, column=0, sticky="new", pady=(0, 10))
+                frame.grid_columnconfigure(1, weight=1)
+                row += 1
+                self._build_section_fields(frame, name, fields)
+
+        self.error_var = tk.StringVar(value="")
+        ttk.Label(body, textvariable=self.error_var, foreground="#c53030", wraplength=720).grid(
+            row=2, column=0, columnspan=2, sticky="w", pady=(2, 0)
+        )
+
+        buttons = ttk.Frame(self, padding=(12, 0, 12, 12))
+        buttons.grid(row=1, column=0, sticky="e")
+        ttk.Button(buttons, text="Cancel", command=self._on_cancel).pack(side="right")
+        ttk.Button(buttons, text="Save", command=self._on_save_clicked).pack(side="right", padx=(0, 8))
+
+    def _build_section_fields(self, frame, section_name, fields):
+        """Adds the label/entry rows for one section to its LabelFrame."""
+        row = 0
+        for key, label, _type in fields:
+            ttk.Label(frame, text=label).grid(row=row, column=0, sticky="w", pady=2)
             var = tk.StringVar(value=str(self.config.get(key, "")))
             if key == "sim_bias_direction":
                 ttk.Combobox(
-                    body, textvariable=var, values=["west", "east"], state="readonly", width=25
+                    frame, textvariable=var, values=["west", "east"], state="readonly", width=25
                 ).grid(row=row, column=1, sticky="ew", padx=(10, 0), pady=2)
+            elif key == "log_folder":
+                ttk.Entry(frame, textvariable=var, width=28).grid(
+                    row=row, column=1, sticky="ew", padx=(10, 0), pady=2
+                )
+                ttk.Button(frame, text="...", width=3, command=self._browse_log_folder).grid(
+                    row=row, column=2, sticky="w", padx=(6, 0), pady=2
+                )
             else:
-                ttk.Entry(body, textvariable=var, width=28).grid(
+                ttk.Entry(frame, textvariable=var, width=28).grid(
                     row=row, column=1, sticky="ew", padx=(10, 0), pady=2
                 )
             self.vars[key] = var
@@ -117,24 +156,14 @@ class SettingsDialog(tk.Toplevel):
 
             if key == "sim_bias_direction":
                 ttk.Label(
-                    body,
+                    frame,
                     text="(true drift rate/ramp below are treated as magnitudes -- this sets their sign)",
-                    foreground="#718096",
-                ).grid(row=row, column=0, columnspan=2, sticky="w", pady=(0, 6))
+                    foreground="#718096", wraplength=330,
+                ).grid(row=row, column=0, columnspan=3, sticky="w", pady=(0, 6))
                 row += 1
 
-            if key == "sim_drift_ramp_arcsec_per_sec_per_hour":
-                row = self._build_profile_controls(body, row)
-
-        self.error_var = tk.StringVar(value="")
-        ttk.Label(body, textvariable=self.error_var, foreground="#c53030", wraplength=340).grid(
-            row=row, column=0, columnspan=2, sticky="w", pady=(8, 0)
-        )
-
-        buttons = ttk.Frame(self, padding=(12, 0, 12, 12))
-        buttons.grid(row=1, column=0, sticky="e")
-        ttk.Button(buttons, text="Cancel", command=self._on_cancel).pack(side="right")
-        ttk.Button(buttons, text="Save", command=self._on_save_clicked).pack(side="right", padx=(0, 8))
+            if key == "sim_drift_ramp_arcsec_per_sec_per_hour" and section_name == self.PROFILE_SECTION:
+                row = self._build_profile_controls(frame, row)
 
     def _build_profile_controls(self, body, row):
         """Convenience controls for loading/clearing a real, log-derived
@@ -149,7 +178,7 @@ class SettingsDialog(tk.Toplevel):
         row += 1
 
         profile_buttons = ttk.Frame(body)
-        profile_buttons.grid(row=row, column=0, columnspan=2, sticky="w", pady=(0, 4))
+        profile_buttons.grid(row=row, column=0, columnspan=3, sticky="w", pady=(0, 4))
         for name in PROFILES:
             ttk.Button(
                 profile_buttons, text=f"Load {name}", command=lambda n=name: self._load_profile(n)
@@ -161,8 +190,8 @@ class SettingsDialog(tk.Toplevel):
 
         ttk.Label(
             body, text="(loading also sets target/declination/hour-angle below to match the source session)",
-            foreground="#718096",
-        ).grid(row=row, column=0, columnspan=2, sticky="w", pady=(0, 6))
+            foreground="#718096", wraplength=330,
+        ).grid(row=row, column=0, columnspan=3, sticky="w", pady=(0, 6))
         row += 1
 
         self._update_profile_status()
@@ -186,6 +215,11 @@ class SettingsDialog(tk.Toplevel):
         ):
             if target_key in target and config_key in self.vars:
                 self.vars[config_key].set(str(target[target_key]))
+
+    def _browse_log_folder(self):
+        folder = filedialog.askdirectory(parent=self, title="Select log folder")
+        if folder:  # empty string = dialog cancelled, leave the entry alone
+            self.vars["log_folder"].set(folder)
 
     def _clear_profile(self):
         self._drift_profile = None

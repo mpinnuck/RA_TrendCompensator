@@ -5,13 +5,15 @@ import queue
 import time
 from datetime import datetime
 
-from src.config import save_config
+from src.config import resolve_log_path, save_config
 from src.model.constants import SIDEREAL_ARCSEC_PER_SEC
 from src.model.data_logger import DataLogger
+from src.model.guide_quality_monitor import GuideQualityMonitor
 from src.model.mount_controller import MountController
 from src.model.phd2_client import PHD2Client
 from src.model.simulated_mount import SimulatedMountController
 from src.model.simulated_phd2_source import SimulatedPHD2Source
+from src.model.status_server import StatusServer
 from src.model.trend_estimator import TrendEstimator
 from src.model.drift_history import DriftHistory
 
@@ -35,6 +37,10 @@ class RATrendCompensatorViewModel:
         self.last_side_of_pier = None
         self.last_apply_time = 0.0
         self.session_start_time = None
+        self.last_slope = None
+        self.last_trend_n_samples = 0
+        self.last_raw_arcsec = None
+        self.last_phd2_avg_dist_arcsec = None
 
     # -- model construction ---------------------------------------------
 
@@ -89,8 +95,31 @@ class RATrendCompensatorViewModel:
             )
 
         self.trend = TrendEstimator(config["window_seconds"], config["min_samples_for_trend"])
+        self.guide_quality = GuideQualityMonitor(
+            config["rms_window_seconds"], config["rms_trend_window_seconds"],
+            config["rms_sample_interval_seconds"],
+        )
         self.drift_history = DriftHistory(config["chart_history_hours"] * 3600)
-        self.data_logger = DataLogger(config["data_log_file"])
+        self.data_logger = DataLogger(resolve_log_path(config, "data_log_file"))
+
+        # The status server's lifecycle is independent of guiding start/stop
+        # (an external tool like a NINA plugin should see "app running, not
+        # yet guiding" rather than no connection at all) -- so unlike mount/
+        # phd2, it must be explicitly stopped here before rebuilding, since
+        # update_config() calls this again while nothing else has torn it
+        # down (the app is stopped, but stopped != status server torn down).
+        if getattr(self, "status_server", None) is not None:
+            self.status_server.stop()
+        if config.get("status_server_enabled", True):
+            self.status_server = StatusServer(
+                config["status_server_host"], config["status_server_port"],
+                get_snapshot=self.get_status_snapshot,
+                interval_seconds=config["status_server_interval_seconds"],
+                logger=self._log,
+            )
+            self.status_server.start()
+        else:
+            self.status_server = None
 
     def update_config(self, new_config):
         """Applies edited Settings: persists to disk and rebuilds the model
@@ -115,7 +144,7 @@ class RATrendCompensatorViewModel:
     def _log(self, msg):
         line = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  {msg}"
         self.log_queue.put(line)
-        with open(self.config["log_file"], "a", encoding="utf-8") as f:
+        with open(resolve_log_path(self.config, "log_file"), "a", encoding="utf-8") as f:
             f.write(line + "\n")
 
     def drain_log_queue(self):
@@ -137,6 +166,26 @@ class RATrendCompensatorViewModel:
         self.drift_history.clear()
         self._log("Drift chart cleared.")
 
+    def get_status_snapshot(self):
+        """JSON-serializable status snapshot broadcast by the status server
+        -- e.g. for a NINA plugin to display live compensator state."""
+        rms_trend_slope, rms_trend_n = self.guide_quality.get_rms_trend()
+        return {
+            "running": self.running,
+            "dry_run": self.dry_run,
+            "current_offset": self.current_offset,
+            "current_ra_deviation_arcsec": self.last_raw_arcsec,
+            "last_slope_arcsec_per_sec": self.last_slope,
+            "last_trend_n_samples": self.last_trend_n_samples,
+            "guide_rms_arcsec": self.guide_quality.current_rms,
+            "guide_rms_trend_arcsec_per_sec": rms_trend_slope,
+            "guide_rms_trend_n_samples": rms_trend_n,
+            "phd2_avg_dist_arcsec": self.last_phd2_avg_dist_arcsec,
+            "declination_deg": self.mount.get_declination(),
+            "side_of_pier": self.last_side_of_pier,
+            "timestamp": time.time(),
+        }
+
     # -- lifecycle -----------------------------------------------------------
 
     def start(self):
@@ -157,6 +206,15 @@ class RATrendCompensatorViewModel:
         self.mount.disconnect()
         self.running = False
 
+    def shutdown(self):
+        """Called when the whole app is closing (not just Stop) -- tears
+        down background resources that live independently of the guiding
+        start/stop cycle, like the status server."""
+        if self.running:
+            self.stop()
+        if self.status_server is not None:
+            self.status_server.stop()
+
     def set_dry_run(self, value):
         self.dry_run = value
         self._log(f"Dry run set to {value}.")
@@ -168,6 +226,18 @@ class RATrendCompensatorViewModel:
         if ra_raw_px is None:
             return
         ra_raw_arcsec = ra_raw_px * self.config["pixel_scale_arcsec"]
+        self.last_raw_arcsec = ra_raw_arcsec
+
+        # AvgDist is PHD2's own smoothed distance (combines RA+Dec, not
+        # RA-isolated), sent with every real GuideStep event -- absent from
+        # our own simulated messages, so this stays None in simulation mode.
+        # It's a cross-check against our own RA-only RMS, computed a
+        # different way by PHD2 itself, not a replacement for it.
+        avg_dist_px = msg.get("AvgDist")
+        self.last_phd2_avg_dist_arcsec = (
+            avg_dist_px * self.config["pixel_scale_arcsec"] if avg_dist_px is not None else None
+        )
+
         # In simulation mode, msg carries the simulator's own clock (which
         # advances by a fixed step per tick regardless of real elapsed
         # time) so the trend fit stays in true arcsec/s units even when
@@ -176,6 +246,7 @@ class RATrendCompensatorViewModel:
         if self.session_start_time is None:
             self.session_start_time = now
         self.trend.add_sample(ra_raw_arcsec, now)
+        self.guide_quality.add_sample(now, ra_raw_arcsec)
         self.drift_history.add_sample(now, ra_raw_arcsec)
 
         side = self.mount.get_side_of_pier()
@@ -188,12 +259,14 @@ class RATrendCompensatorViewModel:
             declination_deg=dec_deg,
             side_of_pier=side,
             dry_run=self.dry_run,
+            phd2_avg_dist_arcsec=self.last_phd2_avg_dist_arcsec,
         )
 
         if self.last_side_of_pier is not None and side != self.last_side_of_pier:
             self._log(f"Pier side changed ({self.last_side_of_pier} -> {side}). "
                        f"Resetting trend window and rate offset.")
             self.trend.reset()
+            self.guide_quality.reset()
             self.current_offset = 0.0
             self.mount.set_ra_rate(0.0, self.dry_run)
             self.drift_history.add_rate_change(now, 0.0)
@@ -206,6 +279,7 @@ class RATrendCompensatorViewModel:
     def _on_guiding_stopped(self):
         self._log("PHD2 guiding stopped -- resetting trend window (not the rate offset).")
         self.trend.reset()
+        self.guide_quality.reset()
 
     def _on_app_state(self, state):
         self._log(f"PHD2 AppState: {state}")
@@ -218,6 +292,9 @@ class RATrendCompensatorViewModel:
             self._log(f"Not enough samples yet for a trend fit "
                        f"({n}/{self.config['min_samples_for_trend']}).")
             return
+
+        self.last_slope = slope
+        self.last_trend_n_samples = n
 
         # slope is a real sky-angular rate (arcsec/s) from the guide camera,
         # unaffected by declination. But Telescope.RightAscensionRate is in

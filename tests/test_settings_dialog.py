@@ -21,6 +21,13 @@ SAMPLE_CONFIG = {
     "log_file": "ra_trend_compensator.log",
     "data_log_file": "ra_trend_compensator_data.csv",
     "chart_history_hours": 8,
+    "status_server_enabled": True,
+    "status_server_host": "127.0.0.1",
+    "status_server_port": 4401,
+    "status_server_interval_seconds": 1.0,
+    "rms_window_seconds": 300,
+    "rms_trend_window_seconds": 1800,
+    "rms_sample_interval_seconds": 60,
     "simulation_mode": False,
     "sim_true_drift_arcsec_per_sec": 0.02,
     "sim_drift_walk_std": 0.0008,
@@ -41,10 +48,7 @@ SAMPLE_CONFIG = {
 
 @pytest.fixture
 def root():
-    try:
-        r = tk.Tk()
-    except tk.TclError as error:
-        pytest.skip(f"Tk is unavailable: {error}")
+    r = tk.Tk()
     r.withdraw()  # headless -- don't flash a window during test runs
     yield r
     r.destroy()

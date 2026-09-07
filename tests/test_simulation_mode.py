@@ -61,6 +61,10 @@ def _sim_config(tmp_path, **overrides):
         "sim_polar_error_arcmin": 0.0,
         "sim_polar_error_angle_deg": 0.0,
         "sim_bias_direction": "west",
+        "status_server_enabled": False,
+        "rms_window_seconds": 60,
+        "rms_trend_window_seconds": 300,
+        "rms_sample_interval_seconds": 5,
     }
     config.update(overrides)
     return config

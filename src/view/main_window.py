@@ -9,7 +9,7 @@ from src.view.settings_dialog import SettingsDialog
 
 LOG_POLL_MS = 250
 CHART_POLL_MS = 1000
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.4.0"
 
 
 class MainWindow(tk.Tk):
@@ -142,8 +142,7 @@ class MainWindow(tk.Tk):
         self.chart.set_history_hours(new_config["chart_history_hours"])
 
     def _on_close(self):
-        if self.vm.running:
-            self.vm.stop()
+        self.vm.shutdown()
         self.destroy()
 
     # -- polling ------------------------------------------------------------

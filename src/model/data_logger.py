@@ -42,7 +42,7 @@ class DataLogger:
         "event_type", "timestamp", "elapsed_seconds",
         "declination_deg", "side_of_pier", "dry_run",
         # guide_step rows:
-        "ra_raw_arcsec", "applied_ra_rate",
+        "ra_raw_arcsec", "applied_ra_rate", "phd2_avg_dist_arcsec",
         # adjustment rows:
         "previous_ra_rate", "slope_arcsec_per_sec", "n_samples", "cos_dec",
         "needed_offset_increment", "damping_factor", "delta_applied", "new_ra_rate",
