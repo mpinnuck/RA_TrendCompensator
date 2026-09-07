@@ -112,9 +112,11 @@ class SimulatedPHD2Source:
 
         self._stop = threading.Event()
         self._thread = None
+        self.is_connected = False
 
     def start(self):
         self._stop.clear()
+        self.is_connected = True
         self._sim_now = time.time()
         mode = f"profile ({len(self.drift_profile)} points)" if self.drift_profile else "constant/ramp"
         target = f"{self.target_name} " if self.target_name else ""
@@ -129,6 +131,7 @@ class SimulatedPHD2Source:
 
     def stop(self):
         self._stop.set()
+        self.is_connected = False
         if self._thread is not None:
             self._thread.join(timeout=2)
         self.on_guiding_stopped()

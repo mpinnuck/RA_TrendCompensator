@@ -54,6 +54,20 @@ def test_client_receives_a_status_snapshot(server):
         conn.close()
 
 
+def test_idle_broadcast_does_not_build_a_snapshot():
+    calls = []
+    srv = StatusServer(
+        host="127.0.0.1", port=0,
+        get_snapshot=lambda: calls.append(True),
+        interval_seconds=1.0,
+        logger=lambda _msg: None,
+    )
+
+    srv._broadcast_once()
+
+    assert calls == []
+
+
 def test_multiple_clients_all_receive_snapshots(server):
     conn1 = _connect(server)
     conn2 = _connect(server)

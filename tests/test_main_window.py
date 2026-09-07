@@ -28,6 +28,9 @@ class FakeViewModel:
     def get_drift_snapshot(self):
         return [], []
 
+    def get_status_client_count(self):
+        return 0
+
     def set_dry_run(self, dry_run):
         self.dry_run = dry_run
 
@@ -71,4 +74,11 @@ def test_version_label_is_shown_in_top_right_control_column(main_window):
     ]
 
     assert len(version_labels) == 1
-    assert version_labels[0].grid_info()["column"] == 5
+    assert version_labels[0].grid_info()["column"] == 6
+
+
+def test_status_client_count_is_displayed(main_window):
+    main_window.vm.get_status_client_count = lambda: 3
+    main_window._poll_log_queue()
+
+    assert main_window.status_clients_var.get() == "Status clients: 3"

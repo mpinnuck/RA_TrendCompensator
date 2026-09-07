@@ -172,6 +172,7 @@ def test_get_status_snapshot_reflects_current_state(view_model):
 
 def test_status_server_is_none_when_disabled(view_model):
     assert view_model.status_server is None  # config fixture sets status_server_enabled=False
+    assert view_model.get_status_client_count() == 0
 
 
 def test_shutdown_stops_a_running_session(view_model):

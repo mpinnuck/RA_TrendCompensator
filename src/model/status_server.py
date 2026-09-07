@@ -90,6 +90,10 @@ class StatusServer:
             time.sleep(self.interval_seconds)
 
     def _broadcast_once(self):
+        with self._clients_lock:
+            if not self._clients:
+                return
+
         try:
             payload = (json.dumps(self.get_snapshot()) + "\n").encode("utf-8")
         except Exception as e:
