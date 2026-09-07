@@ -15,6 +15,16 @@ def test_get_declination_reads_the_ascom_property():
     assert mount.get_declination() == -63.8
 
 
+def test_get_side_of_pier_returns_the_ascom_value():
+    mount = MountController("FAKE.ProgID", max_rate_magnitude=1.0, logger=lambda msg: None)
+
+    mount.telescope = types.SimpleNamespace(SideOfPier=0)
+    assert mount.get_side_of_pier() == 0
+
+    mount.telescope = types.SimpleNamespace(SideOfPier=1)
+    assert mount.get_side_of_pier() == 1
+
+
 def test_get_declination_returns_none_on_driver_error():
     mount = MountController("FAKE.ProgID", max_rate_magnitude=1.0, logger=lambda msg: None)
 

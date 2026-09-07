@@ -8,3 +8,8 @@ SIDEREAL_ARCSEC_PER_SEC = 15.041
 # degree/hour respectively; not a coincidence worth relying on without the
 # explicit conversion).
 HOUR_ANGLE_DEG_PER_SEC = SIDEREAL_ARCSEC_PER_SEC / 3600.0
+
+
+def format_pier_side(value):
+	"""Convert ASCOM's PierSide enum to a readable label."""
+	return {0: "East", 1: "West"}.get(value, "Unknown")

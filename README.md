@@ -19,6 +19,7 @@ By using rolling linear regression on live PHD2 guide errors, the application dy
 - **Data & Event Logging:**
   - Human-readable session text log (`ra_trend_compensator.log`).
   - Structured CSV log (`ra_trend_compensator_data.csv`) capturing guide steps and adjustment cycles for quantitative post-session analysis.
+- **Local Status Server:** Read-only newline-delimited JSON status feed for external tools such as a NINA plugin.
 - **Standalone Executable Support:** Easy PyInstaller build configuration for single-file deployment.
 
 ---
@@ -81,6 +82,32 @@ Settings can be edited via the application's GUI (**Settings...** button) or dir
 | `max_step_per_cycle` | `0.05` | Maximum rate change allowed per single adjustment cycle |
 | `pixel_scale_arcsec` | `0.51` | Camera pixel scale (arcseconds per pixel) |
 | `simulation_mode` | `false` | Enable/disable built-in simulation mode for offline testing |
+| `status_server_enabled` | `true` | Enable the local, read-only status server |
+| `status_server_host` | `"127.0.0.1"` | Interface on which the status server listens; leave local-only unless network access is required |
+| `status_server_port` | `4401` | TCP port for status clients |
+| `status_server_interval_seconds` | `1.0` | Status broadcast interval while one or more clients are connected |
+
+---
+
+## Status Server
+
+When enabled, the application listens on `127.0.0.1:4401` by default and pushes one JSON object per line to every connected TCP client. The server is read-only: clients do not send commands to the compensator.
+
+For example, PowerShell can display the live feed with:
+
+```powershell
+while ($true) {
+   $client = [System.Net.Sockets.TcpClient]::new("127.0.0.1", 4401)
+   $reader = [System.IO.StreamReader]::new($client.GetStream())
+   while (($line = $reader.ReadLine()) -ne $null) { $line }
+   $reader.Dispose()
+   $client.Dispose()
+}
+```
+
+Each line includes `running`, `phd2_connected`, `dry_run`, `current_offset`, current guide/trend/RMS measurements, `declination_deg`, `side_of_pier`, and a Unix `timestamp`. `side_of_pier` is rendered as `"East"`, `"West"`, or `"Unknown"` for external display.
+
+The server stays available while the app is stopped so an external client can observe application state. It does not build or serialize snapshots while no clients are connected.
 
 ---
 
@@ -98,6 +125,16 @@ Settings can be edited via the application's GUI (**Settings...** button) or dir
    ```
 3. In PHD2, ensure **Enable Server** is checked under **Tools** menu.
 4. Click **Start** in RA Trend Compensator to begin monitoring and compensating drift.
+
+If PHD2 is not yet running, the app remains running and retries its PHD2 event-server connection in the background every five seconds. It reconnects automatically after PHD2 is started or restarted.
+
+---
+
+## Recent Updates
+
+- Version `1.6.0` adds a live status-client count in the main toolbar.
+- PHD2 connection retries now run in the background and recover from PHD2 restarts.
+- CSV logs retain ASCOM's numeric pier-side values (`0` or `1`); user-facing status and flip logs show `East` or `West`.
 
 ---
 

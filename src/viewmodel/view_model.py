@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 
 from src.config import resolve_log_path, save_config
-from src.model.constants import SIDEREAL_ARCSEC_PER_SEC
+from src.model.constants import SIDEREAL_ARCSEC_PER_SEC, format_pier_side
 from src.model.data_logger import DataLogger
 from src.model.guide_quality_monitor import GuideQualityMonitor
 from src.model.mount_controller import MountController
@@ -186,7 +186,7 @@ class RATrendCompensatorViewModel:
             "guide_rms_trend_n_samples": rms_trend_n,
             "phd2_avg_dist_arcsec": self.last_phd2_avg_dist_arcsec,
             "declination_deg": self.mount.get_declination(),
-            "side_of_pier": self.last_side_of_pier,
+            "side_of_pier": format_pier_side(self.last_side_of_pier),
             "timestamp": time.time(),
         }
 
@@ -267,7 +267,7 @@ class RATrendCompensatorViewModel:
         )
 
         if self.last_side_of_pier is not None and side != self.last_side_of_pier:
-            self._log(f"Pier side changed ({self.last_side_of_pier} -> {side}). "
+            self._log(f"Pier side changed ({format_pier_side(self.last_side_of_pier)} -> {format_pier_side(side)}). "
                        f"Resetting trend window and rate offset.")
             self.trend.reset()
             self.guide_quality.reset()
