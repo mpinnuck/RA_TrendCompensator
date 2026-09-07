@@ -9,7 +9,7 @@ from src.view.settings_dialog import SettingsDialog
 
 LOG_POLL_MS = 250
 CHART_POLL_MS = 1000
-APP_VERSION = "1.7.0"
+APP_VERSION = "1.8.0"
 
 
 class MainWindow(tk.Tk):

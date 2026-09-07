@@ -197,4 +197,8 @@ class SimulatedPHD2Source:
         self._raw_error += random.gauss(0, self.noise_arcsec)
 
         ra_raw_px = self._raw_error / self.pixel_scale_arcsec
-        self.on_guide_step({"RADistanceRaw": ra_raw_px, "SimTimestamp": self._sim_now})
+        self.on_guide_step({
+            "RADistanceRaw": ra_raw_px,
+            "AvgDist": abs(ra_raw_px),  # RA-only: simulation has no Dec residual model
+            "SimTimestamp": self._sim_now,
+        })

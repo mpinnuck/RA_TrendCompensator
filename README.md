@@ -73,7 +73,7 @@ Settings can be edited via the application's GUI (**Settings...** button) or dir
 | `phd2_host` | `"localhost"` | Hostname or IP address where PHD2 is running |
 | `phd2_port` | `4400` | PHD2 Event Server port |
 | `ascom_prog_id` | `"ASCOM.ASIMount.Telescope"` | ProgID of your ASCOM telescope driver |
-| `dry_run` | `true` | When true, logs rate adjustments without applying them to the mount |
+| `dry_run` | `false` | When true, logs rate adjustments without applying them to the mount |
 | `window_seconds` | `300` | Rolling window length (seconds) for calculating trend slope |
 | `min_samples_for_trend` | `60` | Minimum guide step samples required before calculating drift |
 | `apply_interval_seconds` | `120` | Interval between rate adjustments |

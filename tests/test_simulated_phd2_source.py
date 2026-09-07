@@ -43,6 +43,7 @@ def test_tick_emits_guide_step_shaped_messages():
     assert len(events) == 1
     assert "RADistanceRaw" in events[0]
     assert isinstance(events[0]["RADistanceRaw"], float)
+    assert events[0]["AvgDist"] == abs(events[0]["RADistanceRaw"])
 
 
 def test_uncompensated_drift_grows_the_raw_error():

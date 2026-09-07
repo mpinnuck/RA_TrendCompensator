@@ -9,7 +9,7 @@ DEFAULTS = {
     "phd2_host": "localhost",
     "phd2_port": 4400,
     "ascom_prog_id": "ASCOM.ASIMount.Telescope",
-    "dry_run": True,
+    "dry_run": False,
     "window_seconds": 300,
     "min_samples_for_trend": 60,
     "apply_interval_seconds": 120,
