@@ -14,6 +14,8 @@ class FakeViewModel:
         self.dry_run = False
         self.running = False
         self.current_offset = 0.0
+        self.mount_tracking = True
+        self.phd2 = type("FakePHD2", (), {"is_connected": True})()
         self.clear_drift_history_calls = 0
 
     def start(self):
@@ -56,7 +58,8 @@ def test_start_stop_button_turns_green_while_running(main_window):
     main_window._on_start_stop()
 
     assert main_window.start_stop_button.cget("text") == "Stop"
-    assert main_window.start_stop_button.cget("bg") == "green"
+    assert main_window.start_stop_button.cget("bg") == "#2e9d5d"
+    assert main_window.start_stop_button.cget("fg") == "white"
 
     main_window._on_start_stop()
 
@@ -77,7 +80,7 @@ def test_version_label_is_shown_in_top_right_control_column(main_window):
     ]
 
     assert len(version_labels) == 1
-    assert version_labels[0].grid_info()["column"] == 6
+    assert version_labels[0].grid_info()["column"] == 8
 
 
 def test_status_client_count_is_displayed(main_window):
@@ -85,6 +88,26 @@ def test_status_client_count_is_displayed(main_window):
     main_window._poll_log_queue()
 
     assert main_window.status_clients_var.get() == "Status clients: 3"
+    assert main_window.status_clients_label.cget("bg") == "#2e9d5d"
+    assert main_window.status_clients_label.cget("fg") == "white"
+
+
+def test_connection_indicators_are_colored_by_connection_state(main_window):
+    main_window.vm.phd2 = type("FakePHD2", (), {"is_connected": True})()
+    main_window.vm.mount_tracking = True
+    main_window._refresh_status_indicators()
+
+    assert main_window.phd2_status_label.cget("bg") == "#2e9d5d"
+    assert main_window.phd2_status_label.cget("fg") == "white"
+    assert main_window.mount_status_label.cget("bg") == "#2e9d5d"
+    assert main_window.mount_status_label.cget("fg") == "white"
+
+    main_window.vm.phd2 = type("FakePHD2", (), {"is_connected": False})()
+    main_window.vm.mount_tracking = None
+    main_window._refresh_status_indicators()
+
+    assert main_window.phd2_status_label.cget("bg") == "#d9534f"
+    assert main_window.mount_status_label.cget("bg") == "#d9534f"
 
 
 def test_mount_coordinates_are_displayed_beside_the_offset(main_window):

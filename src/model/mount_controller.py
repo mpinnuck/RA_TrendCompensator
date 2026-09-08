@@ -56,6 +56,17 @@ class MountController:
         except Exception:
             return None
 
+    def get_tracking(self):
+        """Whether the mount is currently tracking, or None if the driver
+        doesn't report it. Used to gate whether adjustments are computed
+        or maintained at all -- PHD2 guiding without the mount tracking
+        means there's no meaningful rate to apply, and correcting a mount
+        that isn't tracking wouldn't do anything anyway."""
+        try:
+            return self.telescope.Tracking
+        except Exception:
+            return None
+
     def set_ra_rate(self, value, dry_run, force=False):
         # CanSetRightAscensionRate is unreliable on this driver (confirmed
         # empirically) -- we attempt the set directly rather than checking it.

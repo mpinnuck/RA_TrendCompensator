@@ -13,6 +13,7 @@ class SimulatedMountController:
         self._side_of_pier = 0
         self._declination_deg = declination_deg
         self._right_ascension_hours = right_ascension_hours
+        self._tracking = True
 
     def connect(self):
         self.connected = True
@@ -37,6 +38,15 @@ class SimulatedMountController:
 
     def get_declination(self):
         return self._declination_deg
+
+    def get_tracking(self):
+        return self._tracking
+
+    def set_tracking(self, value):
+        """Test/simulation helper -- lets a test deliberately toggle
+        tracking off to exercise the idle-state / re-assert-on-resume
+        behavior without needing real mount hardware."""
+        self._tracking = value
 
     def set_declination(self, declination_deg):
         """Test/simulation helper -- a real mount's Declination is read-only

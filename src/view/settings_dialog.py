@@ -17,6 +17,7 @@ class SettingsDialog(tk.Toplevel):
     CHECKBOX_FIELDS = [
         ("simulation_mode", "Simulation mode (synthetic drift data -- no PHD2 or mount hardware)"),
         ("status_server_enabled", "Status server (local-only, for external tools e.g. a NINA plugin)"),
+        ("autostart", "Auto-start on launch (for unattended/scripted startup)"),
     ]
 
     # (config key, display label, type to parse the entry into) -- grouped
@@ -38,6 +39,7 @@ class SettingsDialog(tk.Toplevel):
             ("max_rate_magnitude", "Max rate magnitude", float),
             ("max_step_per_cycle", "Max step per cycle", float),
             ("pixel_scale_arcsec", "Pixel scale (arcsec/px)", float),
+            ("maintain_interval_seconds", "Maintain re-send interval (s)", int),
         ]),
         ("Logging & status", [
             ("chart_history_hours", "Chart history (hours)", float),

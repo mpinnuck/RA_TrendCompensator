@@ -2,6 +2,7 @@
 
 import math
 import queue
+import threading
 import time
 from datetime import datetime
 
@@ -23,6 +24,13 @@ from src.model.drift_history import DriftHistory
 # ~89.4 degrees -- no real imaging target sits this close to the pole.
 MIN_COS_DEC = 0.01
 
+# How often the background maintenance loop wakes up to poll mount tracking
+# state and pier side, and to consider re-sending the current offset. This
+# is independent of maintain_interval_seconds (the throttle on how often a
+# re-send actually happens) and of apply_interval_seconds (how often a NEW
+# trend-based adjustment is computed) -- this is just the poll granularity.
+MAINTAIN_POLL_SECONDS = 2.0
+
 
 class RATrendCompensatorViewModel:
     def __init__(self, config):
@@ -33,11 +41,24 @@ class RATrendCompensatorViewModel:
         self.current_offset = 0.0
         self.last_side_of_pier = None
         self.last_apply_time = 0.0
+        self.last_maintain_time = 0.0
         self.session_start_time = None
         self.last_slope = None
         self.last_trend_n_samples = 0
         self.last_raw_arcsec = None
         self.last_phd2_avg_dist_arcsec = None
+
+        # Three-state model (see _is_actively_correcting()/_is_idle() docs
+        # below): phd2_guiding and paused track PHD2's own signals;
+        # mount_tracking tracks the mount's hardware state directly, polled
+        # by the maintenance thread since PHD2 has no idea whether the
+        # mount is tracking at all.
+        self.phd2_guiding = False
+        self.paused = False
+        self.mount_tracking = None
+
+        self._maintain_thread = None
+        self._maintain_stop = None
 
         self._build_models(config)
 
@@ -82,7 +103,9 @@ class RATrendCompensatorViewModel:
                 polar_error_angle_deg=config["sim_polar_error_angle_deg"],
                 bias_direction=config["sim_bias_direction"],
             )
-            self._log("Simulation mode active -- using synthetic PHD2/mount data.")
+            self._log("Simulation mode active -- using synthetic PHD2/mount data. "
+                       "Note: the simulator does not emit Settling/Paused events, "
+                       "so pause behavior isn't exercised in simulation mode.")
         else:
             self.mount = MountController(
                 config["ascom_prog_id"], config["max_rate_magnitude"], self._log
@@ -92,6 +115,10 @@ class RATrendCompensatorViewModel:
                 on_guide_step=self._on_guide_step,
                 on_guiding_stopped=self._on_guiding_stopped,
                 on_app_state=self._on_app_state,
+                on_settling=self._on_settling,
+                on_settle_done=self._on_settle_done,
+                on_paused=self._on_paused,
+                on_resumed=self._on_resumed,
                 logger=self._log,
             )
 
@@ -182,6 +209,10 @@ class RATrendCompensatorViewModel:
         return {
             "running": self.running,
             "phd2_connected": self.phd2.is_connected,
+            "phd2_guiding": self.phd2_guiding,
+            "paused": self.paused,
+            "mount_tracking": self.mount_tracking,
+            "actively_correcting": self._is_actively_correcting(),
             "dry_run": self.dry_run,
             "current_offset": self.current_offset,
             "current_ra_deviation_arcsec": self.last_raw_arcsec,
@@ -204,18 +235,23 @@ class RATrendCompensatorViewModel:
             return
         self.mount.connect()
         self.last_side_of_pier = self.mount.get_side_of_pier()
+        self.mount_tracking = self.mount.get_tracking()
         self.session_start_time = None  # re-anchored on the first guide step
         self.phd2.start()
         self.running = True
+        self._start_maintain_loop()
         self._log(f"Started (dry_run={self.dry_run}).")
 
     def stop(self):
         if not self.running:
             return
         self._log("Stopping -- resetting RightAscensionRate to 0.")
+        self._stop_maintain_loop()
         self.phd2.stop()
         self.mount.disconnect()
         self.running = False
+        self.phd2_guiding = False
+        self.paused = False
 
     def shutdown(self):
         """Called when the whole app is closing (not just Stop) -- tears
@@ -229,6 +265,74 @@ class RATrendCompensatorViewModel:
     def set_dry_run(self, value):
         self.dry_run = value
         self._log(f"Dry run set to {value}.")
+
+    # -- three-state model -----------------------------------------------------
+
+    def _is_actively_correcting(self):
+        """Tracking + PHD2 actively guiding (not paused) -- the only state
+        where NEW trend samples are accumulated and NEW adjustments are
+        computed. mount_tracking is treated as "ok" when None (driver
+        doesn't report it) to preserve prior behavior on such drivers --
+        only an explicit False blocks this."""
+        return self.mount_tracking is not False and self.phd2_guiding and not self.paused
+
+    def _is_maintain_state(self):
+        """Tracking, but not actively correcting (paused for dither/focus/
+        flip, or PHD2 isn't guiding at all) -- no new computation, but the
+        last known-good offset is worth periodically re-asserting in case
+        something else (an autofocus routine, a flip handler, the driver
+        itself) silently reset RightAscensionRate while we weren't
+        watching for it via guide steps."""
+        return self.mount_tracking is not False and not self._is_actively_correcting()
+
+    def _start_maintain_loop(self):
+        self._maintain_stop = threading.Event()
+        self._maintain_thread = threading.Thread(target=self._maintain_loop, daemon=True)
+        self._maintain_thread.start()
+
+    def _stop_maintain_loop(self):
+        if self._maintain_stop is not None:
+            self._maintain_stop.set()
+        if self._maintain_thread is not None:
+            self._maintain_thread.join(timeout=2)
+        self._maintain_thread = None
+        self._maintain_stop = None
+
+    def _maintain_loop(self):
+        """Runs the whole time the app is Started, independent of whether
+        guide steps are arriving -- this is the only way to notice a pier
+        flip or a tracking-state change during a pause (autofocus, dither,
+        pre-guide-resume after a flip), when no GuideStep events are
+        coming in at all."""
+        while not self._maintain_stop.is_set():
+            try:
+                self._maintain_tick()
+            except Exception as e:
+                self._log(f"WARNING: maintenance tick failed: {e}")
+            self._maintain_stop.wait(MAINTAIN_POLL_SECONDS)
+
+    def _maintain_tick(self):
+        now = time.time()
+
+        tracking = self.mount.get_tracking()
+        if tracking != self.mount_tracking:
+            self._log(f"Mount tracking changed: {self.mount_tracking} -> {tracking}.")
+        self.mount_tracking = tracking
+
+        side = self.mount.get_side_of_pier()
+        if self.last_side_of_pier is not None and side != self.last_side_of_pier:
+            self._log(f"Pier side changed ({format_pier_side(self.last_side_of_pier)} -> {format_pier_side(side)}). "
+                       f"Resetting trend window and rate offset.")
+            self.trend.reset()
+            self.guide_quality.reset()
+            self.current_offset = 0.0
+            self.mount.set_ra_rate(0.0, self.dry_run)
+            self.drift_history.add_rate_change(now, 0.0)
+        self.last_side_of_pier = side
+
+        if self._is_maintain_state() and now - self.last_maintain_time >= self.config["maintain_interval_seconds"]:
+            self.last_maintain_time = now
+            self.mount.set_ra_rate(self.current_offset, self.dry_run)
 
     # -- PHD2 event handlers -------------------------------------------------
 
@@ -256,11 +360,32 @@ class RATrendCompensatorViewModel:
         now = msg.get("SimTimestamp", time.time())
         if self.session_start_time is None:
             self.session_start_time = now
+
+        # Pier-side change detection and reset now live in _maintain_tick()
+        # (runs regardless of whether guide steps are arriving), so a flip
+        # during a pause is caught immediately rather than waiting for
+        # guiding to resume.
+
+        if not self._is_actively_correcting():
+            # Still worth logging the raw deviation/CSV row for reference,
+            # but no new trend sample or adjustment while paused/idle --
+            # see _is_actively_correcting()'s docstring.
+            self.data_logger.log_guide_step(
+                timestamp=datetime.fromtimestamp(now).isoformat(),
+                elapsed_seconds=now - self.session_start_time,
+                ra_raw_arcsec=ra_raw_arcsec,
+                applied_ra_rate=self.current_offset,
+                declination_deg=self.mount.get_declination(),
+                side_of_pier=self.last_side_of_pier,
+                dry_run=self.dry_run,
+                phd2_avg_dist_arcsec=self.last_phd2_avg_dist_arcsec,
+            )
+            return
+
         self.trend.add_sample(ra_raw_arcsec, now)
         self.guide_quality.add_sample(now, ra_raw_arcsec)
         self.drift_history.add_sample(now, ra_raw_arcsec)
 
-        side = self.mount.get_side_of_pier()
         dec_deg = self.mount.get_declination()
         self.data_logger.log_guide_step(
             timestamp=datetime.fromtimestamp(now).isoformat(),
@@ -268,34 +393,58 @@ class RATrendCompensatorViewModel:
             ra_raw_arcsec=ra_raw_arcsec,
             applied_ra_rate=self.current_offset,
             declination_deg=dec_deg,
-            side_of_pier=side,
+            side_of_pier=self.last_side_of_pier,
             dry_run=self.dry_run,
             phd2_avg_dist_arcsec=self.last_phd2_avg_dist_arcsec,
         )
-
-        if self.last_side_of_pier is not None and side != self.last_side_of_pier:
-            self._log(f"Pier side changed ({format_pier_side(self.last_side_of_pier)} -> {format_pier_side(side)}). "
-                       f"Resetting trend window and rate offset.")
-            self.trend.reset()
-            self.guide_quality.reset()
-            self.current_offset = 0.0
-            self.mount.set_ra_rate(0.0, self.dry_run)
-            self.drift_history.add_rate_change(now, 0.0)
-        self.last_side_of_pier = side
 
         if now - self.last_apply_time >= self.config["apply_interval_seconds"]:
             self.last_apply_time = now
             self._consider_adjustment(now)
 
     def _on_guiding_stopped(self):
-        self._log("PHD2 guiding stopped -- resetting trend window (not the rate offset).")
+        if self.phd2_guiding:
+            self._log("PHD2 guiding stopped -- resetting trend window (rate offset retained).")
+        self.phd2_guiding = False
         self.trend.reset()
         self.guide_quality.reset()
 
     def _on_app_state(self, state):
         self._log(f"PHD2 AppState: {state}")
+        if state == "Guiding" and not self.phd2_guiding:
+            self.phd2_guiding = True
+            self.session_start_time = None  # re-anchored on the first guide step of this session
+            self._log("Guiding started -- compensation active.")
+
+    def _on_settling(self):
+        """Dither settling -- the guide star is intentionally offset right
+        now, so this pauses sample accumulation WITHOUT resetting the
+        trend window (unlike _on_guiding_stopped): the underlying drift
+        trend is still valid, only the guide signal is briefly disturbed."""
+        if not self.paused:
+            self._log("Pausing compensation: dither settling.")
+        self.paused = True
+
+    def _on_settle_done(self):
+        if self.paused:
+            self._log("Resuming compensation: settle complete.")
+        self.paused = False
+
+    def _on_paused(self):
+        """PHD2's explicit pause -- how NINA typically suspends guiding
+        around a focus routine or a meridian flip. Same non-resetting
+        pause behavior as _on_settling."""
+        if not self.paused:
+            self._log("Pausing compensation: PHD2 paused (focus/flip).")
+        self.paused = True
+
+    def _on_resumed(self):
+        if self.paused:
+            self._log("Resuming compensation: PHD2 resumed.")
+        self.paused = False
 
     # -- control logic -------------------------------------------------------
+
 
     def _consider_adjustment(self, now):
         slope, n = self.trend.fit_trend()

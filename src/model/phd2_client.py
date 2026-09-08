@@ -8,12 +8,20 @@ import time
 
 class PHD2Client:
     def __init__(self, host, port, on_guide_step, on_guiding_stopped, on_app_state, logger,
+                 on_settling=None, on_settle_done=None, on_paused=None, on_resumed=None,
                  retry_interval_seconds=5):
         self.host = host
         self.port = port
         self.on_guide_step = on_guide_step
         self.on_guiding_stopped = on_guiding_stopped
         self.on_app_state = on_app_state
+        # These four are optional -- existing callers that only care about
+        # guide steps/stop/state (e.g. any external test harness) don't
+        # need to supply them.
+        self.on_settling = on_settling
+        self.on_settle_done = on_settle_done
+        self.on_paused = on_paused
+        self.on_resumed = on_resumed
         self.logger = logger
         self.retry_interval_seconds = retry_interval_seconds
         self._sock = None
@@ -86,3 +94,21 @@ class PHD2Client:
             self.on_guiding_stopped()
         elif event == "AppState":
             self.on_app_state(msg.get("State"))
+        elif event == "Settling":
+            # A dither (or any deliberate lock-point move) is settling --
+            # the guide star is intentionally offset right now, so RA
+            # distance samples during this window would corrupt the trend fit.
+            if self.on_settling:
+                self.on_settling()
+        elif event == "SettleDone":
+            if self.on_settle_done:
+                self.on_settle_done()
+        elif event == "Paused":
+            # PHD2's explicit pause -- this is how NINA typically suspends
+            # guiding around a focus routine or a meridian flip, distinct
+            # from GuidingStopped (a full stop).
+            if self.on_paused:
+                self.on_paused()
+        elif event == "Resumed":
+            if self.on_resumed:
+                self.on_resumed()

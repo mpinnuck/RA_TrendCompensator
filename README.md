@@ -132,9 +132,26 @@ If PHD2 is not yet running, the app remains running and retries its PHD2 event-s
 
 ## Recent Updates
 
-- Version `1.6.0` adds a live status-client count in the main toolbar.
-- PHD2 connection retries now run in the background and recover from PHD2 restarts.
-- CSV logs retain ASCOM's numeric pier-side values (`0` or `1`); user-facing status and flip logs show `East` or `West`.
+### NINA Plugin Integration Release
+
+This release adds the core changes needed for a NINA plugin integration while keeping the existing mount-control workflow intact.
+
+- **Auto-start support**: the new `autostart` config key starts the same existing start routine after the window is fully built, avoiding duplicate startup logic.
+- **PHD2 pause and resume handling**: the client now reacts to `Settling`, `SettleDone`, `Paused`, and `Resumed` events from PHD2's event-monitoring protocol.
+- **Tracking state access**: the mount controller exposes `get_tracking()` with the same defensive error handling as other mount queries, and the simulated mount supports a test hook for tracking-state toggling.
+- **Three-state operating model**:
+  - **Idle**: mount not tracking, so nothing is computed.
+  - **Actively correcting**: tracking, PHD2 guiding, and not paused, preserving the prior behavior.
+  - **Maintain**: tracking but not actively correcting; the app periodically re-sends the last known `current_offset` as a safety net during brief interruptions such as dithering or pauses.
+  - **Reset**: real pier-side changes clear the offset and trend/RMS state as before, and the maintenance thread now catches these transitions promptly even while guiding is paused.
+- **Status snapshot improvements**: `get_status_snapshot()` now includes `phd2_guiding`, `paused`, `mount_tracking`, and `actively_correcting` values for external clients.
+- **Settings dialog additions**: the GUI now includes `maintain_interval_seconds` and `autostart` configuration fields. The boolean field is handled as a checkbox rather than a text field to avoid Python's `bool("False") == True` pitfall.
+
+### Compatibility notes
+
+- The actual RA-rate trend calculation remains unchanged: the adjustment logic is still only called from the actively-correcting path.
+- Simulation mode does not emit pause events because the simulator has no direct concept of them; startup notices alert users to this limitation.
+- The application shutdown flow remains unchanged and still resets the mount rate before stopping status services, which keeps NINA's `Process.CloseMainWindow()` behavior working cleanly.
 
 ---
 

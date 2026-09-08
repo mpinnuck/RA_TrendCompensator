@@ -9,7 +9,7 @@ from src.view.settings_dialog import SettingsDialog
 
 LOG_POLL_MS = 250
 CHART_POLL_MS = 1000
-APP_VERSION = "2.0.0"
+APP_VERSION = "3.2.0"
 
 
 class MainWindow(tk.Tk):
@@ -26,6 +26,13 @@ class MainWindow(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.after(LOG_POLL_MS, self._poll_log_queue)
         self.after(CHART_POLL_MS, self._poll_chart)
+
+        if self.vm.config.get("autostart", False):
+            # Deferred via after() rather than called directly here so the
+            # window is fully constructed and visible first -- matches how
+            # a person clicking Start would experience it, and avoids
+            # starting before the log/chart pollers above are wired up.
+            self.after(200, self._on_start)
 
     # -- layout ---------------------------------------------------------
 
@@ -44,10 +51,27 @@ class MainWindow(tk.Tk):
         controls = ttk.Frame(self, padding=10)
         controls.grid(row=0, column=0, sticky="ew")
 
-        self.start_stop_button = tk.Button(controls, text="Start", command=self._on_start_stop)
+        self.start_stop_button = tk.Button(
+            controls,
+            text="Start",
+            command=self._on_start_stop,
+            padx=12,
+            pady=4,
+            bg="#edf2f7",
+            fg="#1f2d3d",
+            activebackground="#dfe9f4",
+            activeforeground="#1f2d3d",
+            borderwidth=1,
+            relief="raised",
+            highlightthickness=0,
+        )
         self.start_stop_button.grid(row=0, column=0, padx=(0, 5))
 
-        self.settings_button = ttk.Button(controls, text="Settings...", command=self._on_settings)
+        self.settings_button = ttk.Button(
+            controls,
+            text="Settings...",
+            command=self._on_settings,
+        )
         self.settings_button.grid(row=0, column=1, padx=5)
 
         self.dry_run_var = tk.BooleanVar(value=self.vm.dry_run)
@@ -60,11 +84,51 @@ class MainWindow(tk.Tk):
         ttk.Label(controls, text="Status:").grid(row=0, column=3, padx=(15, 5))
         ttk.Label(controls, textvariable=self.status_var).grid(row=0, column=4, sticky="w")
         controls.grid_columnconfigure(4, weight=1)
-        self.status_clients_var = tk.StringVar(value="Status clients: 0")
-        ttk.Label(controls, textvariable=self.status_clients_var).grid(row=0, column=5, padx=(15, 5))
-        ttk.Label(controls, text=f"V {APP_VERSION}", font=("TkDefaultFont", 8)).grid(
-            row=0, column=6, sticky="e"
+
+        self.phd2_status_label = tk.Label(
+            controls,
+            text="PHD2",
+            bg="#edf2f7",
+            fg="#1f2d3d",
+            padx=10,
+            pady=3,
+            relief="raised",
+            borderwidth=1,
+            highlightthickness=0,
         )
+        self.phd2_status_label.grid(row=0, column=5, padx=(15, 5))
+
+        self.mount_status_label = tk.Label(
+            controls,
+            text="Mount",
+            bg="#edf2f7",
+            fg="#1f2d3d",
+            padx=10,
+            pady=3,
+            relief="raised",
+            borderwidth=1,
+            highlightthickness=0,
+        )
+        self.mount_status_label.grid(row=0, column=6, padx=(0, 5))
+
+        self.status_clients_var = tk.StringVar(value="Status clients: 0")
+        self.status_clients_label = tk.Label(
+            controls,
+            textvariable=self.status_clients_var,
+            bg="#edf2f7",
+            fg="#1f2d3d",
+            padx=10,
+            pady=3,
+            relief="raised",
+            borderwidth=1,
+            highlightthickness=0,
+        )
+        self.status_clients_label.grid(row=0, column=7, padx=(15, 5))
+        ttk.Label(controls, text=f"V {APP_VERSION}", font=("TkDefaultFont", 8)).grid(
+            row=0, column=8, sticky="e"
+        )
+
+        self._refresh_status_indicators()
 
         self.mount_coordinates_var = tk.StringVar(value="Mount RA: --  Dec: --")
         ttk.Label(controls, textvariable=self.mount_coordinates_var).grid(
@@ -122,13 +186,25 @@ class MainWindow(tk.Tk):
             self._append_log(f"ERROR starting: {e}")
             return
         self.status_var.set("Running (Simulation)" if self.vm.config.get("simulation_mode") else "Running")
-        self.start_stop_button.config(text="Stop", bg="green", activebackground="green")
+        self.start_stop_button.config(
+            text="Stop",
+            bg="#2e9d5d",
+            fg="white",
+            activebackground="#2e9d5d",
+            activeforeground="white",
+        )
         self.settings_button.config(state="disabled")
 
     def _on_stop(self):
         self.vm.stop()
         self.status_var.set("Stopped")
-        self.start_stop_button.config(text="Start", bg=self.cget("bg"), activebackground=self.cget("bg"))
+        self.start_stop_button.config(
+            text="Start",
+            bg="#edf2f7",
+            fg="#1f2d3d",
+            activebackground="#dfe9f4",
+            activeforeground="#1f2d3d",
+        )
         self.settings_button.config(state="normal")
 
     def _on_dry_run_toggle(self):
@@ -154,11 +230,32 @@ class MainWindow(tk.Tk):
 
     # -- polling ------------------------------------------------------------
 
+    def _refresh_status_indicators(self):
+        phd2_connected = bool(getattr(getattr(self.vm, "phd2", None), "is_connected", False))
+        mount_connected = bool(getattr(self.vm, "mount_tracking", False))
+
+        self.phd2_status_label.config(
+            bg="#2e9d5d" if phd2_connected else "#d9534f",
+            fg="white",
+        )
+        self.mount_status_label.config(
+            bg="#2e9d5d" if mount_connected else "#d9534f",
+            fg="white",
+        )
+
+        client_count = self.vm.get_status_client_count()
+        if client_count > 0:
+            self.status_clients_var.set(f"Status clients: {client_count}")
+            self.status_clients_label.config(bg="#2e9d5d", fg="white")
+        else:
+            self.status_clients_var.set(f"Status clients: {client_count}")
+            self.status_clients_label.config(bg="#edf2f7", fg="#1f2d3d")
+
     def _poll_log_queue(self):
         for line in self.vm.drain_log_queue():
             self._append_log(line)
         self.offset_var.set(f"RightAscensionRate offset: {self.vm.current_offset:+.4f}")
-        self.status_clients_var.set(f"Status clients: {self.vm.get_status_client_count()}")
+        self._refresh_status_indicators()
         self.after(LOG_POLL_MS, self._poll_log_queue)
 
     def _poll_chart(self):
