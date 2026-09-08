@@ -66,7 +66,17 @@ pip install -r requirements-dev.txt
 
 ## Configuration
 
-Settings can be edited via the application's GUI (**Settings...** button) or directly in `config.json`:
+Settings can be edited via the application's GUI (**Settings...** button) or directly in the app's user-data config file.
+
+On Windows, the default config location is:
+
+```text
+%LOCALAPPDATA%\RA_TrendCompensator\config.json
+```
+
+The application does not depend on its current working directory, which is important when it is launched by NINA or another host. Existing project-local `config.json` files are still accepted as a one-time compatibility fallback when no user-data config exists. Saving settings always writes the user-data config by default.
+
+Logs and CSV data also use `%LOCALAPPDATA%\RA_TrendCompensator\` when `log_folder` is blank. Set `log_folder` to use a specific folder; the folder must be writable or the application falls back to the same user-data directory. Absolute `log_file` and `data_log_file` paths are honored as configured.
 
 | Parameter | Default | Description |
 | :--- | :--- | :--- |
@@ -81,6 +91,11 @@ Settings can be edited via the application's GUI (**Settings...** button) or dir
 | `max_rate_magnitude` | `1.0` | Maximum allowed `RightAscensionRate` offset limit |
 | `max_step_per_cycle` | `0.05` | Maximum rate change allowed per single adjustment cycle |
 | `pixel_scale_arcsec` | `0.51` | Camera pixel scale (arcseconds per pixel) |
+| `autostart` | `false` | Start monitoring automatically after the application window is initialized |
+| `maintain_interval_seconds` | `60` | Minimum interval between re-sending the last known RA-rate offset while guiding is paused or idle |
+| `log_folder` | `""` | Optional folder for log and CSV output; blank uses the application user-data directory |
+| `log_file` | `"ra_trend_compensator.log"` | Human-readable text log filename when `log_folder` is used |
+| `data_log_file` | `"ra_trend_compensator_data.csv"` | Structured guide-step and adjustment CSV filename when `log_folder` is used |
 | `simulation_mode` | `false` | Enable/disable built-in simulation mode for offline testing |
 | `status_server_enabled` | `true` | Enable the local, read-only status server |
 | `status_server_host` | `"127.0.0.1"` | Interface on which the status server listens; leave local-only unless network access is required |
@@ -146,10 +161,14 @@ This release adds the core changes needed for a NINA plugin integration while ke
   - **Reset**: real pier-side changes clear the offset and trend/RMS state as before, and the maintenance thread now catches these transitions promptly even while guiding is paused.
 - **Status snapshot improvements**: `get_status_snapshot()` now includes `phd2_guiding`, `paused`, `mount_tracking`, and `actively_correcting` values for external clients.
 - **Settings dialog additions**: the GUI now includes `maintain_interval_seconds` and `autostart` configuration fields. The boolean field is handled as a checkbox rather than a text field to avoid Python's `bool("False") == True` pitfall.
+- **Host-safe config and logging paths**: config, text logs, and CSV data default to the per-user application-data directory instead of the process working directory. This prevents NINA-launched sessions from reading or writing an unrelated or protected folder. Configured log folders remain supported, with a writable-path fallback.
+- **Thread-safe shared state**: guide-step callbacks, maintenance polling, status snapshots, adjustment calculations, and guiding-stop resets are serialized with a shared state lock. This prevents pier-flip resets and status reads from racing with PHD2 callbacks.
+- **Resilient data logging**: the CSV logger checks its destination when opened and during writes, recovering to the per-user application-data directory if the configured location becomes unavailable.
 
 ### Compatibility notes
 
 - The actual RA-rate trend calculation remains unchanged: the adjustment logic is still only called from the actively-correcting path.
+- Guide-step samples and new rate adjustments are collected only while the mount is tracking, PHD2 is guiding, and compensation is not paused. During a pause or idle period, the last known-good offset may be periodically re-sent without adding new trend samples.
 - Simulation mode does not emit pause events because the simulator has no direct concept of them; startup notices alert users to this limitation.
 - The application shutdown flow remains unchanged and still resets the mount rate before stopping status services, which keeps NINA's `Process.CloseMainWindow()` behavior working cleanly.
 

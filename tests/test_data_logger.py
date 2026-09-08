@@ -4,6 +4,7 @@ run. Both guide_step and adjustment rows go in the same file, in real
 chronological order, distinguished by the event_type column."""
 
 import csv
+import os
 
 from src.model.data_logger import DataLogger
 
@@ -101,3 +102,28 @@ def test_reopening_an_existing_file_does_not_duplicate_the_header(tmp_path):
         lines = f.readlines()
     assert lines[0].strip() == ",".join(DataLogger.FIELDS)
     assert len(lines) == 3  # header + 2 data rows, not 2 headers
+
+
+def test_falls_back_to_a_writable_user_data_dir_when_the_target_path_is_unwritable(monkeypatch, tmp_path):
+    bad_dir = tmp_path / "bad_dir"
+    bad_dir.mkdir()
+    fallback_root = tmp_path / "localappdata"
+    fallback_root.mkdir()
+
+    monkeypatch.setenv("LOCALAPPDATA", str(fallback_root))
+
+    original_open = __import__("builtins").open
+
+    def flaky_open(path, *args, **kwargs):
+        if str(path).endswith("data.csv") and os.path.normpath(str(path)).startswith(str(bad_dir)):
+            raise PermissionError(13, "Permission denied")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.open", flaky_open)
+
+    logger = DataLogger(str(bad_dir / "data.csv"))
+
+    assert logger.csv_path == str(fallback_root / "RA_TrendCompensator" / "data.csv")
+    with open(logger.csv_path, newline="", encoding="utf-8") as f:
+        lines = f.readlines()
+    assert lines[0].strip() == ",".join(DataLogger.FIELDS)

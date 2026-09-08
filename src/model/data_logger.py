@@ -37,6 +37,14 @@ import csv
 import os
 
 
+def _fallback_log_dir():
+    for env_var in ("LOCALAPPDATA", "APPDATA", "USERPROFILE", "HOME"):
+        value = os.environ.get(env_var)
+        if value:
+            return value
+    return os.path.expanduser("~")
+
+
 class DataLogger:
     FIELDS = [
         "event_type", "timestamp", "elapsed_seconds",
@@ -50,11 +58,36 @@ class DataLogger:
 
     def __init__(self, csv_path):
         self.csv_path = csv_path
+        self._ensure_writable_path()
         self._ensure_header()
 
+    def _fallback_path(self):
+        fallback_dir = os.path.join(_fallback_log_dir(), "RA_TrendCompensator")
+        os.makedirs(fallback_dir, exist_ok=True)
+        return os.path.join(fallback_dir, os.path.basename(self.csv_path))
+
+    def _is_writable_dir(self, directory):
+        try:
+            if not os.path.isdir(directory):
+                os.makedirs(directory, exist_ok=True)
+            return os.access(directory, os.W_OK)
+        except OSError:
+            return False
+
+    def _ensure_writable_path(self):
+        directory = os.path.dirname(os.path.abspath(self.csv_path)) or os.getcwd()
+        if not self._is_writable_dir(directory):
+            self.csv_path = self._fallback_path()
+
     def _ensure_header(self):
-        needs_header = not os.path.exists(self.csv_path) or os.path.getsize(self.csv_path) == 0
-        if needs_header:
+        try:
+            needs_header = not os.path.exists(self.csv_path) or os.path.getsize(self.csv_path) == 0
+            if needs_header:
+                with open(self.csv_path, "a", newline="", encoding="utf-8") as f:
+                    csv.writer(f).writerow(self.FIELDS)
+            return
+        except OSError:
+            self.csv_path = self._fallback_path()
             with open(self.csv_path, "a", newline="", encoding="utf-8") as f:
                 csv.writer(f).writerow(self.FIELDS)
 
@@ -65,5 +98,12 @@ class DataLogger:
         self._append(event_type="adjustment", **kwargs)
 
     def _append(self, **values):
-        with open(self.csv_path, "a", newline="", encoding="utf-8") as f:
-            csv.writer(f).writerow([values.get(field, "") for field in self.FIELDS])
+        try:
+            if not self._is_writable_dir(os.path.dirname(os.path.abspath(self.csv_path)) or os.getcwd()):
+                self.csv_path = self._fallback_path()
+            with open(self.csv_path, "a", newline="", encoding="utf-8") as f:
+                csv.writer(f).writerow([values.get(field, "") for field in self.FIELDS])
+        except OSError:
+            self.csv_path = self._fallback_path()
+            with open(self.csv_path, "a", newline="", encoding="utf-8") as f:
+                csv.writer(f).writerow([values.get(field, "") for field in self.FIELDS])

@@ -1,5 +1,8 @@
 """ViewModel tests -- driven with fake mount/PHD2 clients, no hardware needed."""
 
+import threading
+import time
+
 import pytest
 
 import src.viewmodel.view_model as vm_module
@@ -109,6 +112,45 @@ def test_guide_steps_are_logged_to_the_data_csv(view_model, config):
 
     assert len(rows) == 3
     assert rows[0]["ra_raw_arcsec"] == str(1.0 * config["pixel_scale_arcsec"])
+
+
+def test_guide_step_is_serialized_behind_maintain_pier_flip_reset(view_model):
+    view_model.mount.side_of_pier = 0
+    view_model.last_side_of_pier = 1
+    view_model.mount_tracking = True
+    view_model.phd2_guiding = True
+
+    enter_reset = threading.Event()
+    continue_reset = threading.Event()
+    original_reset = view_model.trend.reset
+
+    def blocking_reset():
+        enter_reset.set()
+        assert continue_reset.wait(timeout=1.0)
+        return original_reset()
+
+    view_model.trend.reset = blocking_reset
+
+    maintain_thread = threading.Thread(target=view_model._maintain_tick)
+    maintain_thread.start()
+    assert enter_reset.wait(timeout=1.0)
+
+    guide_done = threading.Event()
+
+    def run_guide_step():
+        view_model._on_guide_step({"RADistanceRaw": 1.0})
+        guide_done.set()
+
+    guide_thread = threading.Thread(target=run_guide_step)
+    guide_thread.start()
+
+    time.sleep(0.2)
+    assert not guide_done.is_set(), "guide-step processing should wait behind the maintenance reset"
+
+    continue_reset.set()
+    maintain_thread.join(timeout=2)
+    guide_thread.join(timeout=2)
+    assert guide_done.is_set()
 
 
 def test_adjustment_cycles_are_logged_with_the_rate_that_produced_them(view_model, config):

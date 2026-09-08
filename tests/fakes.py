@@ -13,6 +13,7 @@ class FakeMountController:
         self.connected = False
         self.ra_rate = 0.0
         self.side_of_pier = 0
+        self.tracking = True
         self.right_ascension_hours = 0.0
         self.declination_deg = declination_deg
         self.set_ra_rate_calls = []
@@ -29,6 +30,9 @@ class FakeMountController:
 
     def get_side_of_pier(self):
         return self.side_of_pier
+
+    def get_tracking(self):
+        return self.tracking
 
     def get_right_ascension(self):
         return self.right_ascension_hours
@@ -47,10 +51,16 @@ class FakePHD2Client:
     """Drop-in replacement for PHD2Client -- no real socket connection."""
 
     def __init__(self, host=None, port=None, on_guide_step=None,
-                 on_guiding_stopped=None, on_app_state=None, logger=None):
+                 on_guiding_stopped=None, on_app_state=None,
+                 on_settling=None, on_settle_done=None,
+                 on_paused=None, on_resumed=None, logger=None):
         self.on_guide_step = on_guide_step
         self.on_guiding_stopped = on_guiding_stopped
         self.on_app_state = on_app_state
+        self.on_settling = on_settling
+        self.on_settle_done = on_settle_done
+        self.on_paused = on_paused
+        self.on_resumed = on_resumed
         self.logger = logger or (lambda msg: None)
         self.started = False
         self.is_connected = False
