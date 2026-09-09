@@ -6,6 +6,21 @@ By using rolling linear regression on live PHD2 guide errors, the application dy
 
 ---
 
+## Why It Was Developed
+
+This app grew out of a deep-sky imaging session in which an AM5N mount showed a steadily increasing westward bias after a meridian flip. As the bias accumulated, PHD2 had to work progressively harder to keep the mount tracking smoothly. RA Trend Compensator is intended to detect that persistent, one-directional drift early and gently compensate for it at the mount's tracking-rate level.
+
+### How It Works
+
+- The PHD2 client connects to PHD2's documented TCP event server (port `4400` by default) and receives live `GuideStep` events.
+- Every guide frame, the trend estimator converts PHD2's `RADistanceRaw` from pixels to arcseconds using the configured pixel scale (default `0.51` arcsec/pixel), then adds the sample to a rolling five-minute window.
+- Every two minutes by default, it fits linear regression across that window. A sustained west-bias trend appears as a consistent slope, while normal periodic-error oscillation and back-and-forth guide noise should average toward flat.
+- The ASCOM mount controller converts the slope to a `RightAscensionRate` offset. It applies only 30% of the calculated correction per cycle by default and limits each rate step, preventing one noisy fit from causing an abrupt change or overshoot.
+- A detected pier-side change (`SideOfPier`) or guiding restart resets the trend window and, when configured, the rate correction because drift behavior can change at those points.
+- Dry-run mode calculates and logs every proposed adjustment without changing the mount, so the logic can first be evaluated against real guiding data.
+
+---
+
 ## Key Features
 
 - **Live PHD2 Event Integration:** Connects directly to PHD2's socket event server to receive real-time guide step data (`GuideStep` events).
