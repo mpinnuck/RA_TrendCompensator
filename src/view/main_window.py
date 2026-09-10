@@ -9,7 +9,7 @@ from src.view.settings_dialog import SettingsDialog
 
 LOG_POLL_MS = 250
 CHART_POLL_MS = 1000
-APP_VERSION = "3.6.0"
+APP_VERSION = "4.0.0"
 
 
 class MainWindow(tk.Tk):
@@ -232,7 +232,7 @@ class MainWindow(tk.Tk):
 
     def _refresh_status_indicators(self):
         phd2_connected = bool(getattr(getattr(self.vm, "phd2", None), "is_connected", False))
-        mount_connected = bool(getattr(self.vm, "mount_tracking", False))
+        mount_connected = bool(getattr(getattr(self.vm, "mount", None), "connected", False))
 
         self.phd2_status_label.config(
             bg="#2e9d5d" if phd2_connected else "#d9534f",

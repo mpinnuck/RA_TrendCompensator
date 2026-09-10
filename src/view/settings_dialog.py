@@ -18,6 +18,7 @@ class SettingsDialog(tk.Toplevel):
         ("simulation_mode", "Simulation mode (synthetic drift data -- no PHD2 or mount hardware)"),
         ("status_server_enabled", "Status server (local-only, for external tools e.g. a NINA plugin)"),
         ("autostart", "Auto-start on launch (for unattended/scripted startup)"),
+        ("invert_ra_sign", "Invert RA error sign (enable if it's opposite to PHD2's)"),
     ]
 
     # (config key, display label, type to parse the entry into) -- grouped

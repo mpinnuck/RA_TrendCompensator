@@ -15,6 +15,7 @@ class FakeViewModel:
         self.running = False
         self.current_offset = 0.0
         self.mount_tracking = True
+        self.mount = type("FakeMount", (), {"connected": True})()
         self.phd2 = type("FakePHD2", (), {"is_connected": True})()
         self.clear_drift_history_calls = 0
 
@@ -94,7 +95,7 @@ def test_status_client_count_is_displayed(main_window):
 
 def test_connection_indicators_are_colored_by_connection_state(main_window):
     main_window.vm.phd2 = type("FakePHD2", (), {"is_connected": True})()
-    main_window.vm.mount_tracking = True
+    main_window.vm.mount.connected = True
     main_window._refresh_status_indicators()
 
     assert main_window.phd2_status_label.cget("bg") == "#2e9d5d"
@@ -103,7 +104,7 @@ def test_connection_indicators_are_colored_by_connection_state(main_window):
     assert main_window.mount_status_label.cget("fg") == "white"
 
     main_window.vm.phd2 = type("FakePHD2", (), {"is_connected": False})()
-    main_window.vm.mount_tracking = None
+    main_window.vm.mount.connected = False
     main_window._refresh_status_indicators()
 
     assert main_window.phd2_status_label.cget("bg") == "#d9534f"

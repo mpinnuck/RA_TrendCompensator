@@ -76,6 +76,7 @@ DEFAULTS = {
     "max_rate_magnitude": 1.0,
     "max_step_per_cycle": 0.05,
     "pixel_scale_arcsec": 0.51,
+    "invert_ra_sign": False,
     "autostart": False,
     "maintain_interval_seconds": 60,
     "log_folder": "",

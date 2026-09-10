@@ -13,3 +13,12 @@ HOUR_ANGLE_DEG_PER_SEC = SIDEREAL_ARCSEC_PER_SEC / 3600.0
 def format_pier_side(value):
 	"""Convert ASCOM's PierSide enum to a readable label."""
 	return {0: "East", 1: "West"}.get(value, "Unknown")
+
+
+def is_known_pier_side(value):
+	"""True for ASCOM's East (0) / West (1) pier sides. Some drivers
+	intermittently report pierUnknown (-1) on an otherwise-unflipped mount --
+	treating that as a real transition would spuriously reset the trend
+	window and try to zero RightAscensionRate while the driver is in a
+	state that rejects the write."""
+	return value in (0, 1)

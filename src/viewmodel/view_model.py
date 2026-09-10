@@ -7,7 +7,7 @@ import time
 from datetime import datetime
 
 from src.config import resolve_log_path, save_config
-from src.model.constants import SIDEREAL_ARCSEC_PER_SEC, format_pier_side
+from src.model.constants import SIDEREAL_ARCSEC_PER_SEC, format_pier_side, is_known_pier_side
 from src.model.data_logger import DataLogger
 from src.model.guide_quality_monitor import GuideQualityMonitor
 from src.model.mount_controller import MountController
@@ -266,6 +266,11 @@ class RATrendCompensatorViewModel:
 
     def set_dry_run(self, value):
         self.dry_run = value
+        # Keep config in sync (and persist) -- otherwise a later Settings
+        # Save (built from a dict(self.config) snapshot that still has the
+        # old value) silently reverts this live toggle back on save.
+        self.config["dry_run"] = value
+        save_config(self.config)
         self._log(f"Dry run set to {value}.")
 
     # -- three-state model -----------------------------------------------------
@@ -324,15 +329,19 @@ class RATrendCompensatorViewModel:
         side = self.mount.get_side_of_pier()
 
         with self._state_lock:
-            if self.last_side_of_pier is not None and side != self.last_side_of_pier:
-                self._log(f"Pier side changed ({format_pier_side(self.last_side_of_pier)} -> {format_pier_side(side)}). "
-                           f"Resetting trend window and rate offset.")
-                self.trend.reset()
-                self.guide_quality.reset()
-                self.current_offset = 0.0
-                self.mount.set_ra_rate(0.0, self.dry_run)
-                self.drift_history.add_rate_change(now, 0.0)
-            self.last_side_of_pier = side
+            # Only known (East/West) reads count as the mount's actual side --
+            # a transient pierUnknown from the driver is neither latched as
+            # the new state nor treated as a flip away from the last known one.
+            if is_known_pier_side(side):
+                if self.last_side_of_pier is not None and side != self.last_side_of_pier:
+                    self._log(f"Pier side changed ({format_pier_side(self.last_side_of_pier)} -> {format_pier_side(side)}). "
+                               f"Resetting trend window and rate offset.")
+                    self.trend.reset()
+                    self.guide_quality.reset()
+                    self.current_offset = 0.0
+                    self.mount.set_ra_rate(0.0, self.dry_run)
+                    self.drift_history.add_rate_change(now, 0.0)
+                self.last_side_of_pier = side
 
             if self._is_maintain_state() and now - self.last_maintain_time >= self.config["maintain_interval_seconds"]:
                 self.last_maintain_time = now
@@ -345,6 +354,12 @@ class RATrendCompensatorViewModel:
         if ra_raw_px is None:
             return
         ra_raw_arcsec = ra_raw_px * self.config["pixel_scale_arcsec"]
+        # PHD2's RADistanceRaw sign is whatever its own RA calibration axis
+        # produced for this rig -- not guaranteed to match the direction this
+        # app treats as positive. Rather than guess, this is a user-toggled
+        # escape hatch (Settings) for when the two disagree.
+        if self.config.get("invert_ra_sign"):
+            ra_raw_arcsec = -ra_raw_arcsec
 
         with self._state_lock:
             self.last_raw_arcsec = ra_raw_arcsec

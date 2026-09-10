@@ -1,5 +1,8 @@
 """Wraps the ASCOM telescope COM driver for reading/setting RightAscensionRate."""
 
+import threading
+
+import pythoncom
 import win32com.client
 
 
@@ -8,14 +11,54 @@ class MountController:
         self.prog_id = prog_id
         self.max_rate_magnitude = max_rate_magnitude
         self.logger = logger
-        self.telescope = None
+        self.connected = False
+        self._git = None
+        self._git_cookie = None
+        # A raw win32com dispatch pointer is apartment-threaded -- reusing the
+        # one created by connect() (on the GUI thread) directly from the
+        # maintenance loop and PHD2's guide-step thread caused intermittent,
+        # silently-swallowed COM failures (e.g. "Property ... can not be
+        # set", or a property read throwing and getting treated as None).
+        # Each thread instead gets its own proxy, fetched from the Global
+        # Interface Table and cached here.
+        self._local = threading.local()
 
     def connect(self):
-        self.telescope = win32com.client.Dispatch(self.prog_id)
-        self.telescope.Connected = True
-        if not self.telescope.Connected:
+        pythoncom.CoInitialize()
+        telescope = win32com.client.Dispatch(self.prog_id)
+        telescope.Connected = True
+        if not telescope.Connected:
             raise RuntimeError("Mount driver reported Connected = False")
+        self._git = pythoncom.CoCreateInstance(
+            pythoncom.CLSID_StdGlobalInterfaceTable, None,
+            pythoncom.CLSCTX_INPROC_SERVER, pythoncom.IID_IGlobalInterfaceTable,
+        )
+        self._git_cookie = self._git.RegisterInterfaceInGlobal(telescope._oleobj_, pythoncom.IID_IDispatch)
+        self.telescope = telescope
+        self.connected = True
         self.logger(f"Connected to {self.prog_id}")
+
+    @property
+    def telescope(self):
+        """Per-thread COM proxy. The setter caches an explicit value for the
+        calling thread only (used by connect() and by tests); otherwise this
+        marshals a fresh proxy from the Global Interface Table for whichever
+        thread is asking, since a proxy created elsewhere can't safely cross
+        threads on its own."""
+        cached = getattr(self._local, "telescope", None)
+        if cached is not None:
+            return cached
+        if self._git is None:
+            return None
+        pythoncom.CoInitialize()
+        dispatch = self._git.GetInterfaceFromGlobal(self._git_cookie, pythoncom.IID_IDispatch)
+        telescope = win32com.client.Dispatch(dispatch)
+        self._local.telescope = telescope
+        return telescope
+
+    @telescope.setter
+    def telescope(self, value):
+        self._local.telescope = value
 
     def disconnect(self):
         if not self.telescope:
@@ -28,6 +71,14 @@ class MountController:
             self.telescope.Connected = False
         except Exception:
             pass
+        if self._git is not None and self._git_cookie is not None:
+            try:
+                self._git.RevokeInterfaceFromGlobal(self._git_cookie)
+            except Exception:
+                pass
+        self._git = None
+        self._git_cookie = None
+        self.connected = False
 
     def get_ra_rate(self):
         return self.telescope.RightAscensionRate
