@@ -1,0 +1,7 @@
+{
+    "plantuml.render": "Local",
+    "plantuml.exportFormat": "svg",
+    "plantuml.exportOutDir": "diagrams",
+    "plantuml.exportSubFolder": false,
+    "plantuml.exportIncludeFolderHeirarchy": false
+}

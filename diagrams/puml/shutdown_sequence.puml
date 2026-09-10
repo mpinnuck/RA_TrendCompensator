@@ -1,0 +1,42 @@
+@startuml Shutdown Sequence
+!pragma layout smetana
+skinparam linetype ortho
+skinparam shadowing false
+
+title Stop monitoring and close application
+actor User
+participant MainWindow
+participant ViewModel
+participant PHD2Client
+participant MountController
+participant StatusServer
+participant SingleInstance
+
+User -> MainWindow: close window
+activate MainWindow
+MainWindow -> ViewModel: shutdown()
+activate ViewModel
+alt monitoring running
+    ViewModel -> ViewModel: stop()
+    ViewModel -> ViewModel: stop maintenance thread
+    ViewModel -> PHD2Client: stop()
+    activate PHD2Client
+    PHD2Client --> ViewModel: worker stopped
+    deactivate PHD2Client
+    ViewModel -> MountController: disconnect()
+    activate MountController
+    MountController -> MountController: set_ra_rate(0.0, force=true)
+    MountController --> ViewModel: disconnected
+    deactivate MountController
+end
+ViewModel -> StatusServer: stop()
+activate StatusServer
+StatusServer --> ViewModel: server stopped
+deactivate StatusServer
+ViewModel --> MainWindow: shutdown complete
+deactivate ViewModel
+MainWindow -> MainWindow: destroy()
+MainWindow --> User: application closed
+deactivate MainWindow
+SingleInstance -> SingleInstance: release()
+@enduml

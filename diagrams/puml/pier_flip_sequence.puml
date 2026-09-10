@@ -1,0 +1,50 @@
+@startuml Pier Flip Reset
+!pragma layout smetana
+skinparam linetype ortho
+skinparam shadowing false
+
+title Pier-side change detected by maintenance polling
+participant ViewModel
+participant MountController
+participant TrendEstimator
+participant GuideQualityMonitor
+participant DriftHistory
+
+loop maintenance polling
+    ViewModel -> ViewModel: _maintain_tick()
+    activate ViewModel
+    ViewModel -> MountController: get_tracking()
+    activate MountController
+    MountController --> ViewModel: tracking state
+    deactivate MountController
+    ViewModel -> MountController: get_side_of_pier()
+    activate MountController
+    MountController --> ViewModel: new pier side
+    deactivate MountController
+    alt side differs from last_side_of_pier
+        ViewModel -> ViewModel: log pier-side change
+        ViewModel -> TrendEstimator: reset()
+        activate TrendEstimator
+        TrendEstimator --> ViewModel: trend reset
+        deactivate TrendEstimator
+        ViewModel -> GuideQualityMonitor: reset()
+        activate GuideQualityMonitor
+        GuideQualityMonitor --> ViewModel: quality reset
+        deactivate GuideQualityMonitor
+        ViewModel -> ViewModel: current_offset = 0.0
+        ViewModel -> MountController: set_ra_rate(0.0, dry_run)
+        activate MountController
+        MountController --> ViewModel: rate reset
+        deactivate MountController
+        ViewModel -> DriftHistory: add_rate_change(now, 0.0)
+        activate DriftHistory
+        DriftHistory --> ViewModel: reset marker stored
+        deactivate DriftHistory
+        ViewModel -> ViewModel: store new pier side
+    else unchanged
+        ViewModel -> ViewModel: continue maintenance
+    end
+    ViewModel --> ViewModel: maintenance tick complete
+    deactivate ViewModel
+end
+@enduml

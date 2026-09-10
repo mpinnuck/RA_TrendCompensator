@@ -160,6 +160,36 @@ If PHD2 is not yet running, the app remains running and retries its PHD2 event-s
 
 ---
 
+## Architecture Diagrams
+
+The project uses PlantUML diagrams maintained alongside the Python source. PlantUML does not automatically infer complete runtime diagrams from Python; when code behavior changes, update the relevant `.puml` source after reviewing the changed classes, callbacks, threads, or execution path.
+
+### VS Code workflow
+
+Install the `jebbs.plantuml` extension, then:
+
+1. Open a diagram source in `diagrams/`.
+2. Press `Option+D` from a Mac remote session, or `Alt+D` on Windows, to preview it.
+3. Use **PlantUML: Export Current Diagram** to generate the SVG.
+4. Review the generated image directly under `diagrams/`.
+
+Workspace settings select local rendering, SVG output, and the `diagrams/` destination. Editable `.puml` sources are kept under `diagrams/puml/`, while generated SVGs are kept directly under `diagrams/` for quick review. Keep both under version control so GitHub can display the rendered documentation.
+
+### Current diagrams
+
+- [Class diagram source](diagrams/puml/ra_trend_compensator_class.puml) | [SVG](diagrams/RA%20Trend%20Compensator%20Class%20Diagram.svg)
+- [Startup sequence source](diagrams/puml/startup_sequence.puml) | [SVG](diagrams/Startup%20Sequence.svg)
+- [GuideStep compensation source](diagrams/puml/guide_step_sequence.puml) | [SVG](diagrams/Guide%20Step%20Compensation.svg)
+- [PHD2 reconnect source](diagrams/puml/phd2_reconnect_sequence.puml) | [SVG](diagrams/PHD2%20Reconnect.svg)
+- [Pause and resume source](diagrams/puml/pause_resume_sequence.puml) | [SVG](diagrams/Pause%20Resume.svg)
+- [Pier-side reset source](diagrams/puml/pier_flip_sequence.puml) | [SVG](diagrams/Pier%20Flip%20Reset.svg)
+- [Simulation mode source](diagrams/puml/simulation_sequence.puml) | [SVG](diagrams/Simulation%20Guide%20Step.svg)
+- [Shutdown sequence source](diagrams/puml/shutdown_sequence.puml) | [SVG](diagrams/Shutdown%20Sequence.svg)
+
+Class diagrams describe the application structure. Sequence diagrams describe selected runtime scenarios, including asynchronous PHD2 callbacks, maintenance polling, simulation, and shutdown behavior. After a relevant Python change, update the affected PlantUML source, preview it, validate it, and export a new SVG.
+
+---
+
 ## Recent Updates
 
 ### NINA Plugin Integration Release

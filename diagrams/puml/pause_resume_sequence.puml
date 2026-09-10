@@ -1,0 +1,68 @@
+@startuml Pause Resume
+!pragma layout smetana
+skinparam linetype ortho
+skinparam shadowing false
+
+title Pause, maintain, and resume compensation
+participant PHD2EventServer
+participant PHD2Client
+participant ViewModel
+participant MountController
+participant TrendEstimator
+
+PHD2EventServer -> PHD2Client: Settling or Paused event
+activate PHD2Client
+PHD2Client -> ViewModel: _on_settling() / _on_paused()
+activate ViewModel
+ViewModel -> ViewModel: paused = true
+deactivate ViewModel
+deactivate PHD2Client
+note right: Existing trend window is retained.
+
+PHD2Client -> ViewModel: GuideStep during pause
+activate PHD2Client
+activate ViewModel
+ViewModel -> MountController: get_declination()
+activate MountController
+MountController --> ViewModel: declination
+deactivate MountController
+ViewModel -> ViewModel: log raw guide step only
+ViewModel -> TrendEstimator: no new sample
+deactivate ViewModel
+PHD2Client --> PHD2Client: GuideStep handled
+deactivate PHD2Client
+
+loop maintenance polling while paused
+    ViewModel -> ViewModel: _maintain_tick()
+    activate ViewModel
+    ViewModel -> MountController: get_tracking()
+    activate MountController
+    MountController --> ViewModel: tracking state
+    deactivate MountController
+    ViewModel -> MountController: get_side_of_pier()
+    activate MountController
+    MountController --> ViewModel: pier side
+    deactivate MountController
+    ViewModel -> MountController: set_ra_rate(current_offset, dry_run)
+    activate MountController
+    MountController --> ViewModel: offset maintained
+    deactivate MountController
+    ViewModel --> ViewModel: maintenance tick complete
+    deactivate ViewModel
+end
+
+PHD2EventServer -> PHD2Client: SettleDone or Resumed event
+activate PHD2Client
+PHD2Client -> ViewModel: _on_settle_done() / _on_resumed()
+activate ViewModel
+ViewModel -> ViewModel: paused = false
+deactivate ViewModel
+deactivate PHD2Client
+PHD2Client -> ViewModel: next GuideStep
+activate ViewModel
+ViewModel -> TrendEstimator: add_sample()
+activate TrendEstimator
+TrendEstimator --> ViewModel: sample accepted
+deactivate TrendEstimator
+deactivate ViewModel
+@enduml

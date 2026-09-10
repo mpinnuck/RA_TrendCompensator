@@ -1,0 +1,142 @@
+@startuml RA Trend Compensator Class Diagram
+!pragma layout smetana
+
+top to bottom direction
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam packageStyle rectangle
+skinparam packageBorderThickness 1
+skinparam classBorderThickness 1
+skinparam classBackgroundColor #FFFFFF
+skinparam classHeaderBackgroundColor #F2F2F2
+skinparam classFontColor #202020
+skinparam packageFontStyle bold
+skinparam stereotypeCBackgroundColor #FFF2CC
+skinparam stereotypeCBorderColor #B8860B
+skinparam stereotypeVBackgroundColor #DDEBF7
+skinparam stereotypeVBorderColor #4F81BD
+skinparam stereotypeMBackgroundColor #E2F0D9
+skinparam stereotypeMBorderColor #5B8C5A
+skinparam classAttributeIconSize 0
+
+package "Application" <<C>> #FFF8E1 {
+  class main <<module>> {
+    +main(argv)
+  }
+
+  class SingleInstance <<guard>> {
+    +acquire()
+    +release()
+  }
+}
+
+package "View" <<C>> #FFF8E1 {
+  class MainWindow <<view>> {
+    +_on_start()
+    +_on_stop()
+    +_poll_chart()
+  }
+
+  class DriftChartPanel <<view>> {
+    +update_data()
+    +set_history_hours()
+  }
+}
+
+package "ViewModel" <<V>> #EAF3FB {
+  class "RATrendCompensatorViewModel" as ViewModel <<coordinator>> {
+    +start()
+    +stop()
+    +shutdown()
+    +get_status_snapshot()
+    -_on_guide_step(msg)
+    -_consider_adjustment(now)
+  }
+}
+
+package "Model" <<M>> #EEF7ED {
+  package "Adapters and Sources" {
+    class MountController <<adapter>> {
+      +connect()
+      +disconnect()
+      +get_declination()
+      +set_ra_rate(value, dry_run)
+    }
+
+    class PHD2Client <<adapter>> {
+      +start()
+      +stop()
+      -_handle_line(line)
+    }
+
+    class SimulatedMountController <<simulation>> {
+      +set_ra_rate()
+      +get_tracking()
+    }
+
+    class SimulatedPHD2Source <<simulation>> {
+      +start()
+      +stop()
+      +tick()
+      +on_guide_step(msg)
+    }
+  }
+
+  package "Analysis and Services" {
+    class TrendEstimator <<service>> {
+      +add_sample()
+      +fit_trend()
+      +reset()
+    }
+
+    class GuideQualityMonitor <<service>> {
+      +add_sample()
+      +get_rms_trend()
+      +reset()
+    }
+
+    class DriftHistory <<store>> {
+      +add_sample()
+      +add_rate_change()
+      +snapshot()
+    }
+
+    class DataLogger <<service>> {
+      +log_guide_step()
+      +log_adjustment()
+    }
+
+    class StatusServer <<service>> {
+      +start()
+      +stop()
+      -_broadcast_once()
+    }
+  }
+}
+
+' Keep the two Model rows distinct so association lines route around classes.
+MountController -[hidden]down-> TrendEstimator
+PHD2Client -[hidden]down-> GuideQualityMonitor
+
+main --> SingleInstance : creates
+main --> ViewModel : creates
+main --> MainWindow : creates
+MainWindow --> ViewModel : commands / reads
+MainWindow --> DriftChartPanel : renders
+
+ViewModel *-- MountController : live mount
+ViewModel *-- PHD2Client : live guide source
+ViewModel *-- TrendEstimator
+ViewModel *-- GuideQualityMonitor
+ViewModel *-- DriftHistory
+ViewModel *-- DataLogger
+ViewModel *-- StatusServer
+
+ViewModel ..> SimulatedMountController : simulation alternative
+ViewModel ..> SimulatedPHD2Source : simulation alternative
+PHD2Client --> ViewModel : guide callbacks
+SimulatedPHD2Source --> ViewModel : guide callbacks
+DriftChartPanel --> DriftHistory : displays
+@enduml

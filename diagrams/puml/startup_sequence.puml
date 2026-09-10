@@ -1,0 +1,67 @@
+@startuml Startup Sequence
+!pragma layout smetana
+skinparam linetype ortho
+skinparam shadowing false
+
+title Application startup and monitoring start
+actor User
+participant main
+participant SingleInstance
+participant Config
+participant ViewModel
+participant StatusServer
+participant MainWindow
+participant MountController
+participant PHD2Client
+
+User -> main: launch application
+activate main
+main -> SingleInstance: acquire()
+activate SingleInstance
+SingleInstance --> main: acquired: true or false
+deactivate SingleInstance
+deactivate main
+alt another instance exists
+    main -> main: focus_existing_instance()
+else first instance
+    activate main
+    main -> Config: load_config()
+    activate Config
+    Config --> main: config
+    deactivate Config
+    main -> ViewModel: __init__(config)
+    activate ViewModel
+    ViewModel -> StatusServer: start()
+    activate StatusServer
+    StatusServer --> ViewModel: listening
+    deactivate StatusServer
+    ViewModel --> main: ViewModel ready
+    deactivate ViewModel
+    main -> MainWindow: __init__(ViewModel)
+    activate MainWindow
+    MainWindow --> main: window ready
+    deactivate MainWindow
+    MainWindow --> User: display window
+    User -> MainWindow: click Start
+    MainWindow -> ViewModel: start()
+    activate ViewModel
+    ViewModel -> MountController: connect()
+    activate MountController
+    MountController --> ViewModel: connected
+    deactivate MountController
+    ViewModel -> MountController: get_side_of_pier()
+    activate MountController
+    MountController --> ViewModel: pier side
+    deactivate MountController
+    ViewModel -> MountController: get_tracking()
+    activate MountController
+    MountController --> ViewModel: tracking state
+    deactivate MountController
+    ViewModel ->> PHD2Client: start() [worker thread]
+    ViewModel -> ViewModel: start maintenance thread
+    ViewModel --> MainWindow: running = true
+    deactivate ViewModel
+    main -> MainWindow: mainloop()
+    deactivate main
+end
+@enduml

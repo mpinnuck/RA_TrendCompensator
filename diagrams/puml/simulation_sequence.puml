@@ -1,0 +1,70 @@
+@startuml Simulation Guide Step
+!pragma layout smetana
+skinparam linetype ortho
+skinparam shadowing false
+
+title Closed-loop simulation mode
+participant ViewModel
+participant SimulatedMountController
+participant SimulatedPHD2Source
+participant TrendEstimator
+participant DriftHistory
+
+ViewModel -> ViewModel: __init__(config)
+activate ViewModel
+ViewModel -> ViewModel: _build_models(config)
+ViewModel -> SimulatedMountController: create simulated mount
+activate SimulatedMountController
+SimulatedMountController --> ViewModel: mount ready
+deactivate SimulatedMountController
+ViewModel -> SimulatedPHD2Source: create source with callbacks
+activate SimulatedPHD2Source
+SimulatedPHD2Source --> ViewModel: source ready
+deactivate SimulatedPHD2Source
+ViewModel -> TrendEstimator: create trend estimator
+ViewModel -> DriftHistory: create drift history
+ViewModel --> ViewModel: constructor complete
+deactivate ViewModel
+ViewModel -> SimulatedMountController: connect()
+activate SimulatedMountController
+SimulatedMountController --> ViewModel: connected
+deactivate SimulatedMountController
+ViewModel -> SimulatedPHD2Source: start()
+activate SimulatedPHD2Source
+SimulatedPHD2Source --> ViewModel: feed started
+deactivate SimulatedPHD2Source
+SimulatedPHD2Source -> SimulatedPHD2Source: tick()
+activate SimulatedPHD2Source
+SimulatedPHD2Source -> SimulatedMountController: get_applied_rate()
+activate SimulatedMountController
+SimulatedMountController --> SimulatedPHD2Source: current offset
+deactivate SimulatedMountController
+SimulatedPHD2Source -> SimulatedPHD2Source: compute residual drift and raw error
+SimulatedPHD2Source -> ViewModel: on_guide_step(GuideStep-shaped msg)
+activate ViewModel
+ViewModel -> TrendEstimator: add_sample()
+activate TrendEstimator
+TrendEstimator --> ViewModel: sample accepted
+deactivate TrendEstimator
+ViewModel -> DriftHistory: add_sample()
+activate DriftHistory
+DriftHistory --> ViewModel: sample stored
+deactivate DriftHistory
+ViewModel -> TrendEstimator: fit_trend()
+activate TrendEstimator
+TrendEstimator --> ViewModel: slope, sample count
+deactivate TrendEstimator
+ViewModel -> SimulatedMountController: set_ra_rate(new_offset, dry_run)
+activate SimulatedMountController
+SimulatedMountController --> ViewModel: rate applied
+deactivate SimulatedMountController
+deactivate ViewModel
+SimulatedPHD2Source --> SimulatedPHD2Source: tick complete
+deactivate SimulatedPHD2Source
+loop each simulated guide interval
+    SimulatedPHD2Source -> SimulatedPHD2Source: tick()
+    activate SimulatedPHD2Source
+    SimulatedPHD2Source --> SimulatedPHD2Source: tick complete
+    deactivate SimulatedPHD2Source
+end
+@enduml

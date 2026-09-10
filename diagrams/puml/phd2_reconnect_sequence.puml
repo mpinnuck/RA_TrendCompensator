@@ -1,0 +1,39 @@
+@startuml PHD2 Reconnect
+!pragma layout smetana
+skinparam linetype ortho
+skinparam shadowing false
+
+title PHD2 connection retry and recovery
+participant ViewModel
+participant PHD2Client
+participant PHD2EventServer
+
+ViewModel -> PHD2Client: start()
+activate PHD2Client
+loop until connected or stopped
+    PHD2Client -> PHD2EventServer: connect(host, port)
+    activate PHD2EventServer
+    alt connection succeeds
+        PHD2EventServer --> PHD2Client: TCP connection
+        deactivate PHD2EventServer
+        PHD2Client -> PHD2Client: is_connected = true
+        PHD2Client -> ViewModel: log Connected to PHD2
+        activate ViewModel
+        ViewModel --> PHD2Client: log queued
+        deactivate ViewModel
+        break connection established
+        end
+    else connection fails
+        PHD2EventServer --> PHD2Client: connection error
+        deactivate PHD2EventServer
+        PHD2Client -> ViewModel: log error and retry notice
+        activate ViewModel
+        ViewModel --> PHD2Client: log queued
+        deactivate ViewModel
+        PHD2Client -> PHD2Client: wait retry_interval_seconds
+    end
+end
+PHD2EventServer -> PHD2Client: newline-delimited JSON events
+PHD2Client -> ViewModel: callback for each event
+deactivate PHD2Client
+@enduml

@@ -1,0 +1,78 @@
+@startuml Guide Step Compensation
+!pragma layout smetana
+skinparam linetype ortho
+skinparam shadowing false
+
+title One PHD2 GuideStep through closed-loop compensation
+participant PHD2Client
+participant ViewModel
+participant MountController
+participant TrendEstimator
+participant GuideQualityMonitor
+participant DriftHistory
+participant DataLogger
+
+PHD2Client -> PHD2Client: _handle_line(line)
+activate PHD2Client
+PHD2Client -> ViewModel: _on_guide_step(msg)
+activate ViewModel
+ViewModel -> ViewModel: convert RADistanceRaw pixels to arcsec
+alt not actively correcting
+    ViewModel -> DataLogger: log_guide_step(...)
+    activate DataLogger
+    DataLogger --> ViewModel: row written
+    deactivate DataLogger
+else tracking + guiding + not paused
+    ViewModel -> TrendEstimator: add_sample(arcsec, timestamp)
+    activate TrendEstimator
+    TrendEstimator --> ViewModel: sample accepted
+    deactivate TrendEstimator
+    ViewModel -> GuideQualityMonitor: add_sample(timestamp, arcsec)
+    activate GuideQualityMonitor
+    GuideQualityMonitor --> ViewModel: RMS updated
+    deactivate GuideQualityMonitor
+    ViewModel -> DriftHistory: add_sample(timestamp, arcsec)
+    activate DriftHistory
+    DriftHistory --> ViewModel: sample stored
+    deactivate DriftHistory
+    ViewModel -> MountController: get_declination()
+    activate MountController
+    MountController --> ViewModel: declination
+    deactivate MountController
+    ViewModel -> DataLogger: log_guide_step(...)
+    activate DataLogger
+    DataLogger --> ViewModel: row written
+    deactivate DataLogger
+    alt apply interval elapsed
+        ViewModel -> TrendEstimator: fit_trend()
+        activate TrendEstimator
+        TrendEstimator --> ViewModel: slope, sample_count
+        deactivate TrendEstimator
+        alt enough samples and safe declination
+            ViewModel -> MountController: get_declination()
+            activate MountController
+            MountController --> ViewModel: declination
+            deactivate MountController
+            ViewModel -> ViewModel: calculate damped rate delta
+            ViewModel -> MountController: set_ra_rate(new_offset, dry_run)
+            activate MountController
+            MountController --> ViewModel: rate applied
+            deactivate MountController
+            ViewModel -> DriftHistory: add_rate_change(timestamp, new_offset)
+            activate DriftHistory
+            DriftHistory --> ViewModel: marker stored
+            deactivate DriftHistory
+            ViewModel -> DataLogger: log_adjustment(...)
+            activate DataLogger
+            DataLogger --> ViewModel: row written
+            deactivate DataLogger
+        else insufficient samples or near pole
+            ViewModel -> ViewModel: skip adjustment
+        end
+    end
+end
+ViewModel --> PHD2Client: callback complete
+deactivate ViewModel
+PHD2Client --> PHD2Client: line handled
+deactivate PHD2Client
+@enduml
