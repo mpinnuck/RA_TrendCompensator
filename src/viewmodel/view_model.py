@@ -236,7 +236,10 @@ class RATrendCompensatorViewModel:
         if self.running:
             return
         self.mount.connect()
-        self.last_side_of_pier = self.mount.get_side_of_pier()
+        side = self.mount.get_side_of_pier()
+        # Same guard as _maintain_tick: an Unknown reading right at connect
+        # must not taint the baseline and trigger a spurious flip-reset later.
+        self.last_side_of_pier = side if is_known_pier_side(side) else None
         self.mount_tracking = self.mount.get_tracking()
         self.session_start_time = None  # re-anchored on the first guide step
         self.phd2.start()
